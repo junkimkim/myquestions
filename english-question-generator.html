@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuizForge — 영어 변형문제 생성기</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2333;
+    --border: #2a2f45;
+    --accent: #e8c87d;
+    --accent2: #7db8e8;
+    --text: #e8eaf0;
+    --text2: #8b90a8;
+    --success: #6dcc9a;
+    --danger: #e87d7d;
+    --tag1: rgba(232,200,125,0.12);
+    --tag2: rgba(125,184,232,0.12);
+    --tag3: rgba(109,204,154,0.12);
+    --tag4: rgba(168,125,232,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(232,200,125,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(232,200,125,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+    color: var(--text2);
+    font-weight: 300;
+  }
+
+  /* SECTION LABELS */
+  .section-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* API KEY */
+  .api-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+  }
+
+  .api-row svg { flex-shrink: 0; opacity: 0.6; }
+
+  .api-row input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+  }
+
+  .api-row input::placeholder { color: #3a4060; }
+
+  .api-status {
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .api-status.ok { background: rgba(109,204,154,0.15); color: var(--success); }
+  .api-status.empty { background: rgba(139,144,168,0.1); color: var(--text2); }
+
+  /* PASSAGE INPUT */
+  .passage-wrap {
+    position: relative;
+    margin-bottom: 32px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 200px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.75;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus { border-color: rgba(232,200,125,0.4); }
+  textarea::placeholder { color: #3a4060; }
+
+  .char-count {
+    position: absolute;
+    bottom: 14px;
+    right: 16px;
+    font-size: 0.72rem;
+    color: var(--text2);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* QUESTION TYPES */
+  .types-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .type-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    user-select: none;
+  }
+
+  .type-card:hover { border-color: rgba(232,200,125,0.3); }
+
+  .type-card.active {
+    border-color: var(--accent);
+    background: rgba(232,200,125,0.06);
+  }
+
+  .type-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+    transition: all 0.2s;
+  }
+
+  .type-card.active .type-check {
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  .type-check svg { display: none; }
+  .type-card.active .type-check svg { display: block; }
+
+  .type-info { flex: 1; }
+
+  .type-name {
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+
+  .type-desc {
+    font-size: 0.75rem;
+    color: var(--text2);
+    line-height: 1.4;
+  }
+
+  .type-tag {
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+    white-space: nowrap;
+    align-self: flex-start;
+    margin-top: 2px;
+  }
+
+  .t1 { background: var(--tag1); color: var(--accent); }
+  .t2 { background: var(--tag2); color: var(--accent2); }
+  .t3 { background: var(--tag3); color: var(--success); }
+  .t4 { background: var(--tag4); color: #a87de8; }
+
+  /* GENERATE BUTTON */
+  .btn-generate {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0f1117;
+    border: none;
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 48px;
+  }
+
+  .btn-generate:hover { background: #f0d490; transform: translateY(-1px); }
+  .btn-generate:active { transform: translateY(0); }
+  .btn-generate:disabled {
+    background: #2a2f45;
+    color: var(--text2);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* SPINNER */
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0f1117;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* RESULTS */
+  .results-wrap { margin-bottom: 60px; }
+
+  .result-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 20px;
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .result-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .result-body {
+    padding: 22px;
+    font-size: 0.88rem;
+    line-height: 1.85;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* DOWNLOAD BAR */
+  .download-bar {
+    position: sticky;
+    bottom: 24px;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 40px;
+  }
+
+  .btn-download {
+    padding: 14px 32px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 40px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+  }
+
+  .btn-download:hover {
+    background: var(--accent);
+    color: #0f1117;
+    border-color: var(--accent);
+  }
+
+  .btn-download svg { transition: transform 0.2s; }
+  .btn-download:hover svg { transform: translateY(2px); }
+
+  /* PROMPT MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: min(640px, 94vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 28px;
+  }
+
+  .modal h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    margin-bottom: 6px;
+  }
+
+  .modal p { font-size: 0.82rem; color: var(--text2); margin-bottom: 20px; }
+
+  .prompt-item { margin-bottom: 20px; }
+
+  .prompt-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .prompt-item textarea {
+    min-height: 100px;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    font-family: 'DM Mono', monospace;
+    resize: vertical;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-sm {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover { border-color: var(--text); color: var(--text); }
+  .btn-primary { background: var(--accent); color: #0f1117; }
+  .btn-primary:hover { background: #f0d490; }
+
+  /* SETTINGS ICON */
+  .settings-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text2);
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 32px;
+  }
+
+  .settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text2);
+  }
+
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 16px; opacity: 0.4; }
+  .empty-state p { font-size: 0.88rem; }
+
+  /* ERROR */
+  .error-msg {
+    background: rgba(232,125,125,0.1);
+    border: 1px solid rgba(232,125,125,0.3);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.84rem;
+    color: var(--danger);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  scrollbar-width: thin;
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-row">
+      <span class="logo">QuizForge</span>
+      <span class="logo-badge">for Teachers</span>
+    </div>
+    <p class="subtitle">영어 지문 → AI 변형문제 자동 생성 · Word 파일 다운로드</p>
+  </header>
+
+  <!-- API KEY -->
+  <div class="section-label">API 설정</div>
+  <div class="api-row">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+    </svg>
+    <input type="password" id="apiKey" placeholder="sk-..." oninput="updateApiStatus()">
+    <span class="api-status empty" id="apiStatus">미입력</span>
+  </div>
+
+  <!-- PASSAGE -->
+  <div class="section-label">영어 지문 입력</div>
+  <div class="passage-wrap">
+    <textarea id="passage" placeholder="분석할 영어 지문을 여기에 붙여넣으세요..." oninput="updateCharCount()"></textarea>
+    <span class="char-count" id="charCount">0자</span>
+  </div>
+
+  <!-- QUESTION TYPES -->
+  <div class="section-label">문제 유형 선택</div>
+  <div class="types-grid">
+    <div class="type-card active" onclick="toggleType(this, 'blank')" data-type="blank">
+      <div class="type-check">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#0f1117" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div class="type-info">
+        <div class="type-name">빈칸 추론</div>
+        <div class="type-desc">핵심 어구를 빈칸으로 처리하고 5지선다 보기 생성</div>
+      </div>
+      <span class="type-tag t1">수능형</span>
+    </div>
+    <div class="type-card active" onclick="toggleType(this, 'order')" data-type="order">
+      <div class="type-check">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#0f1117" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div class="type-info">
+        <div class="type-name">순서 배열</div>
+        <div class="type-desc">문단을 섞어서 올바른 순서를 찾는 문제</div>
+      </div>
+      <span class="type-tag t2">논리형</span>
+    </div>
+    <div class="type-card active" onclick="toggleType(this, 'title')" data-type="title">
+      <div class="type-check">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#0f1117" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div class="type-info">
+        <div class="type-name">제목/주제 추론</div>
+        <div class="type-desc">글의 제목 또는 주제를 고르는 5지선다 문제</div>
+      </div>
+      <span class="type-tag t3">독해형</span>
+    </div>
+    <div class="type-card active" onclick="toggleType(this, 'grammar')" data-type="grammar">
+      <div class="type-check">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#0f1117" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <div class="type-info">
+        <div class="type-name">문법/어법</div>
+        <div class="type-desc">어법상 옳은/틀린 표현 찾기 문제 생성</div>
+      </div>
+      <span class="type-tag t4">문법형</span>
+    </div>
+  </div>
+
+  <!-- PROMPT SETTINGS BUTTON -->
+  <button class="settings-btn" onclick="openModal()">
+    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    프롬프트 설정 편집
+  </button>
+
+  <!-- GENERATE BUTTON -->
+  <button class="btn-generate" id="generateBtn" onclick="generateQuestions()">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+    </svg>
+    변형문제 생성하기
+  </button>
+
+  <!-- RESULTS -->
+  <div id="resultsSection" class="results-wrap" style="display:none"></div>
+
+  <!-- DOWNLOAD BAR -->
+  <div id="downloadBar" class="download-bar" style="display:none">
+    <button class="btn-download" onclick="downloadDocx()">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/>
+      </svg>
+      Word 파일로 다운로드 (.docx)
+    </button>
+  </div>
+
+</div>
+
+<!-- PROMPT SETTINGS MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <h3>프롬프트 설정</h3>
+    <p>각 문제 유형별로 GPT에 전달되는 지시문을 수정할 수 있습니다. <code style="font-size:0.78rem;background:var(--surface2);padding:1px 6px;border-radius:4px;">{passage}</code>는 입력 지문으로 자동 대체됩니다.</p>
+
+    <div class="prompt-item">
+      <div class="prompt-label"><span class="type-tag t1" style="font-size:0.65rem">빈칸 추론</span></div>
+      <textarea id="p_blank"></textarea>
+    </div>
+    <div class="prompt-item">
+      <div class="prompt-label"><span class="type-tag t2" style="font-size:0.65rem">순서 배열</span></div>
+      <textarea id="p_order"></textarea>
+    </div>
+    <div class="prompt-item">
+      <div class="prompt-label"><span class="type-tag t3" style="font-size:0.65rem">제목/주제 추론</span></div>
+      <textarea id="p_title"></textarea>
+    </div>
+    <div class="prompt-item">
+      <div class="prompt-label"><span class="type-tag t4" style="font-size:0.65rem">문법/어법</span></div>
+      <textarea id="p_grammar"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-sm btn-ghost" onclick="resetPrompts()">기본값으로 초기화</button>
+      <button class="btn-sm btn-primary" onclick="savePrompts()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ======== DEFAULT PROMPTS ========
+const DEFAULT_PROMPTS = {
+  blank: `다음 영어 지문을 읽고, 수능 영어 빈칸 추론 문제를 1문항 생성해 주세요.
+
+[지문]
+{passage}
+
+[요구사항]
+1. 지문에서 핵심 내용을 담은 어구(단어 또는 짧은 구)를 선정하여 빈칸(_____)으로 처리하세요.
+2. 빈칸이 포함된 지문 전체를 제시하세요.
+3. 정답을 포함한 5개의 선택지를 만드세요. 오답도 지문 맥락과 유사하게 만드세요.
+4. 정답 번호와 해설(한국어)을 제시하세요.
+5. 출력 형식:
+   [문제] ... 
+   ① ② ③ ④ ⑤
+   [정답] 
+   [해설]`,
+
+  order: `다음 영어 지문을 읽고, 수능 영어 순서 배열 문제를 1문항 생성해 주세요.
+
+[지문]
+{passage}
+
+[요구사항]
+1. 지문을 주어진 첫 문장(도입부) 1개와 (A), (B), (C) 세 단락으로 나누세요.
+2. 도입 문장을 제시한 후, (A)/(B)/(C) 세 단락을 섞어서 제시하세요.
+3. 올바른 순서를 포함한 5개의 보기를 만드세요 (예: ① (A)-(C)-(B) 형식).
+4. 정답 번호와 순서 근거를 한국어로 해설하세요.
+5. 출력 형식:
+   [문제] 주어진 글 다음에 이어질 글의 순서로 가장 적절한 것은?
+   [도입 문장] ...
+   (A) ... (B) ... (C) ...
+   ① ② ③ ④ ⑤
+   [정답]
+   [해설]`,
+
+  title: `다음 영어 지문을 읽고, 수능 영어 제목/주제 추론 문제를 2문항 생성해 주세요.
+
+[지문]
+{passage}
+
+[요구사항]
+1. 첫 번째 문항: 글의 제목으로 가장 적절한 것을 고르는 문제 (영어 선택지 5개)
+2. 두 번째 문항: 글의 주제로 가장 적절한 것을 고르는 문제 (한국어 선택지 5개)
+3. 오답 선택지는 지문과 관련은 있지만 핵심을 벗어난 내용으로 만드세요.
+4. 각 문항마다 정답 번호와 한국어 해설을 제시하세요.
+5. 출력 형식:
+   [1번 - 제목 추론]
+   ① ② ③ ④ ⑤
+   [정답] [해설]
+   [2번 - 주제 추론]
+   ① ② ③ ④ ⑤
+   [정답] [해설]`,
+
+  grammar: `다음 영어 지문을 읽고, 수능 영어 어법 문제를 1문항 생성해 주세요.
+
+[지문]
+{passage}
+
+[요구사항]
+1. 지문의 5곳에 밑줄(또는 번호 표시)을 치고, 어법상 맞는 표현 또는 틀린 표현을 고르는 문제를 만드세요.
+2. 형식은 "다음 밑줄 친 부분 중 어법상 틀린 것은?" 형태로 하세요.
+3. 밑줄 친 부분에 ①②③④⑤ 번호를 매기세요. 나머지 4개는 옳고 1개만 틀리도록 구성하세요.
+4. 정답 번호와 문법적 설명을 한국어로 해설하세요.
+5. 출력 형식:
+   [문제] 다음 글의 밑줄 친 부분 중, 어법상 틀린 것은?
+   [지문 - 밑줄 표시 포함]
+   [정답]
+   [해설]`
+};
+
+let prompts = { ...DEFAULT_PROMPTS };
+let results = {};
+
+// ======== CHAR COUNT ========
+function updateCharCount() {
+  const len = document.getElementById('passage').value.length;
+  document.getElementById('charCount').textContent = `${len.toLocaleString()}자`;
+}
+
+// ======== API STATUS ========
+function updateApiStatus() {
+  const key = document.getElementById('apiKey').value.trim();
+  const el = document.getElementById('apiStatus');
+  if (key.startsWith('sk-') && key.length > 20) {
+    el.textContent = '입력됨';
+    el.className = 'api-status ok';
+  } else {
+    el.textContent = '미입력';
+    el.className = 'api-status empty';
+  }
+}
+
+// ======== TOGGLE TYPE ========
+function toggleType(card, type) {
+  card.classList.toggle('active');
+}
+
+function getActiveTypes() {
+  return [...document.querySelectorAll('.type-card.active')].map(c => c.dataset.type);
+}
+
+// ======== MODAL ========
+function openModal() {
+  document.getElementById('p_blank').value = prompts.blank;
+  document.getElementById('p_order').value = prompts.order;
+  document.getElementById('p_title').value = prompts.title;
+  document.getElementById('p_grammar').value = prompts.grammar;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+}
+
+function savePrompts() {
+  prompts.blank = document.getElementById('p_blank').value;
+  prompts.order = document.getElementById('p_order').value;
+  prompts.title = document.getElementById('p_title').value;
+  prompts.grammar = document.getElementById('p_grammar').value;
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function resetPrompts() {
+  prompts = { ...DEFAULT_PROMPTS };
+  document.getElementById('p_blank').value = prompts.blank;
+  document.getElementById('p_order').value = prompts.order;
+  document.getElementById('p_title').value = prompts.title;
+  document.getElementById('p_grammar').value = prompts.grammar;
+}
+
+// ======== GENERATE ========
+async function generateQuestions() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const passage = document.getElementById('passage').value.trim();
+  const activeTypes = getActiveTypes();
+
+  if (!apiKey || !apiKey.startsWith('sk-')) {
+    showError('OpenAI API 키를 입력해주세요. (sk-로 시작)');
+    return;
+  }
+  if (!passage) {
+    showError('영어 지문을 입력해주세요.');
+    return;
+  }
+  if (activeTypes.length === 0) {
+    showError('최소 한 가지 문제 유형을 선택해주세요.');
+    return;
+  }
+
+  const btn = document.getElementById('generateBtn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner"></div> 생성 중... (${activeTypes.length}가지 유형)`;
+
+  const section = document.getElementById('resultsSection');
+  section.style.display = 'block';
+  section.innerHTML = '';
+  results = {};
+
+  const typeInfo = {
+    blank:   { label: '빈칸 추론', tagClass: 't1' },
+    order:   { label: '순서 배열', tagClass: 't2' },
+    title:   { label: '제목/주제 추론', tagClass: 't3' },
+    grammar: { label: '문법/어법', tagClass: 't4' }
+  };
+
+  for (const type of activeTypes) {
+    const { label, tagClass } = typeInfo[type];
+
+    // Placeholder
+    const block = document.createElement('div');
+    block.className = 'result-block';
+    block.id = `result-${type}`;
+    block.innerHTML = `
+      <div class="result-header">
+        <div class="result-title">
+          <span class="type-tag ${tagClass}">${label}</span>
+        </div>
+        <div class="spinner" style="width:16px;height:16px;border-width:2px;border-top-color:var(--accent)"></div>
+      </div>
+      <div class="result-body" style="color:var(--text2);font-style:italic">생성 중...</div>`;
+    section.appendChild(block);
+
+    try {
+      const prompt = prompts[type].replace('{passage}', passage);
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: '당신은 수능 영어 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 1200,
+          temperature: 0.7
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.error) throw new Error(data.error.message);
+
+      const text = data.choices[0].message.content;
+      results[type] = { label, text };
+
+      block.innerHTML = `
+        <div class="result-header">
+          <div class="result-title">
+            <span class="type-tag ${tagClass}">${label}</span>
+          </div>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--success)" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <div class="result-body">${escapeHtml(text)}</div>`;
+
+    } catch (err) {
+      results[type] = null;
+      block.innerHTML = `
+        <div class="result-header">
+          <div class="result-title"><span class="type-tag ${tagClass}">${label}</span></div>
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--danger)" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </div>
+        <div class="result-body" style="color:var(--danger)">오류: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> 다시 생성하기`;
+
+  const hasResults = Object.values(results).some(r => r);
+  if (hasResults) {
+    document.getElementById('downloadBar').style.display = 'flex';
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showError(msg) {
+  const section = document.getElementById('resultsSection');
+  section.style.display = 'block';
+  section.innerHTML = `<div class="error-msg">
+    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+    ${msg}
+  </div>`;
+}
+
+// ======== DOWNLOAD DOCX ========
+async function downloadDocx() {
+  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = docx;
+
+  const children = [];
+
+  // Title
+  children.push(
+    new Paragraph({
+      children: [new TextRun({ text: 'QuizForge — 변형문제', bold: true, size: 32 })],
+      heading: HeadingLevel.TITLE,
+      spacing: { after: 400 }
+    })
+  );
+
+  // Passage
+  const passage = document.getElementById('passage').value.trim();
+  children.push(
+    new Paragraph({ children: [new TextRun({ text: '📄 원본 지문', bold: true, size: 24 })] }),
+    new Paragraph({ children: [new TextRun({ text: passage, size: 22 })], spacing: { after: 400 } })
+  );
+
+  // Each result
+  for (const [type, result] of Object.entries(results)) {
+    if (!result) continue;
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: `▶ ${result.label}`, bold: true, color: '1a1a2e', size: 26 })],
+        border: { bottom: { value: 'single', size: 6, color: 'e8c87d' } },
+        spacing: { before: 400, after: 200 }
+      })
+    );
+
+    // Split by lines
+    const lines = result.text.split('\n');
+    for (const line of lines) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: line || ' ', size: 22 })],
+          spacing: { after: 80 }
+        })
+      );
+    }
+  }
+
+  const doc = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(doc);
+  saveAs(blob, `변형문제_${new Date().toLocaleDateString('ko-KR').replace(/\./g, '').replace(/ /g, '')}.docx`);
+}
+</script>
+</body>
+</html>

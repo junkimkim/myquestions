@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { DEFAULT_CUSTOM_PROMPT, DEFAULT_WRITING_PROMPT, getTypeKind } from '@/lib/defaultPrompts';
+import {
+  DEFAULT_CUSTOM_PROMPT,
+  DEFAULT_VOCAB_PROMPT,
+  DEFAULT_WRITING_PROMPT,
+  defaultCustomPromptForKind,
+  getTypeKind,
+} from '@/lib/defaultPrompts';
 import QuizForgeNav from '@/components/QuizForgeNav';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 
@@ -51,7 +57,7 @@ export default function TypesManagePage() {
       setEditName(c.name);
       setEditDesc(c.desc || '');
       setEditKind(getTypeKind(c));
-      setEditPrompt(prompts[c.id] ?? (getTypeKind(c) === 'writing' ? DEFAULT_WRITING_PROMPT : DEFAULT_CUSTOM_PROMPT));
+      setEditPrompt(prompts[c.id] ?? defaultCustomPromptForKind(getTypeKind(c)));
       setEditExampleFile(null);
       setEditError('');
       setEditOk('');
@@ -69,7 +75,12 @@ export default function TypesManagePage() {
       return;
     }
     const prompt =
-      editPrompt.trim() || (editKind === 'writing' ? DEFAULT_WRITING_PROMPT : DEFAULT_CUSTOM_PROMPT);
+      editPrompt.trim() ||
+      (editKind === 'writing'
+        ? DEFAULT_WRITING_PROMPT
+        : editKind === 'vocabulary'
+          ? DEFAULT_VOCAB_PROMPT
+          : DEFAULT_CUSTOM_PROMPT);
     if (!prompt.includes('{passage}')) {
       setEditError('프롬프트에 {passage}를 포함해야 합니다.');
       return;
@@ -78,8 +89,13 @@ export default function TypesManagePage() {
       setEditError('영작 유형은 프롬프트에 {answer}를 포함해야 합니다.');
       return;
     }
+    if (editKind === 'vocabulary' && !prompt.includes('{vocab}')) {
+      setEditError('어휘 유형은 프롬프트에 {vocab}를 포함해야 합니다.');
+      return;
+    }
 
-    const storedKind = editKind === 'writing' ? 'writing' : 'mcq';
+    const storedKind =
+      editKind === 'writing' ? 'writing' : editKind === 'vocabulary' ? 'vocabulary' : 'mcq';
     setCustomTypes((prev) =>
       prev.map((t) =>
         t.id === editId ? { ...t, name: n, desc: editDesc.trim() || '사용자 정의 유형', kind: storedKind } : t,
@@ -119,7 +135,12 @@ export default function TypesManagePage() {
       return;
     }
     const prompt =
-      promptText.trim() || (newKind === 'writing' ? DEFAULT_WRITING_PROMPT : DEFAULT_CUSTOM_PROMPT);
+      promptText.trim() ||
+      (newKind === 'writing'
+        ? DEFAULT_WRITING_PROMPT
+        : newKind === 'vocabulary'
+          ? DEFAULT_VOCAB_PROMPT
+          : DEFAULT_CUSTOM_PROMPT);
     if (!prompt.includes('{passage}')) {
       setFormError('프롬프트에 {passage}를 포함해야 합니다.');
       return;
@@ -128,9 +149,14 @@ export default function TypesManagePage() {
       setFormError('영작 유형은 프롬프트에 {answer}를 포함해야 합니다.');
       return;
     }
+    if (newKind === 'vocabulary' && !prompt.includes('{vocab}')) {
+      setFormError('어휘 유형은 프롬프트에 {vocab}를 포함해야 합니다.');
+      return;
+    }
 
     const id = `c_${crypto.randomUUID().replace(/-/g, '')}`;
-    const storedKind = newKind === 'writing' ? 'writing' : 'mcq';
+    const storedKind =
+      newKind === 'writing' ? 'writing' : newKind === 'vocabulary' ? 'vocabulary' : 'mcq';
 
     setCustomTypes((prev) => [...prev, { id, name: n, desc: desc.trim() || '사용자 정의 유형', kind: storedKind }]);
     setPrompts((prev) => ({ ...prev, [id]: prompt }));
@@ -201,9 +227,19 @@ export default function TypesManagePage() {
                 <li key={c.id} className="typesManageItem">
                   <div className="typesManageInfo">
                     <span
-                      className={`typesKindBadge ${getTypeKind(c) === 'writing' ? 'typesKindBadgeWriting' : ''}`}
+                      className={`typesKindBadge ${
+                        getTypeKind(c) === 'writing'
+                          ? 'typesKindBadgeWriting'
+                          : getTypeKind(c) === 'vocabulary'
+                            ? 'typesKindBadgeVocab'
+                            : ''
+                      }`}
                     >
-                      {getTypeKind(c) === 'writing' ? '영작' : '객관식'}
+                      {getTypeKind(c) === 'writing'
+                        ? '영작'
+                        : getTypeKind(c) === 'vocabulary'
+                          ? '어휘'
+                          : '객관식'}
                     </span>
                     <strong>{c.name}</strong>
                     <span className="typesManageMeta">{c.desc}</span>
@@ -247,7 +283,9 @@ export default function TypesManagePage() {
                     checked={newKind === 'mcq'}
                     onChange={() => {
                       setNewKind('mcq');
-                      if (promptText === DEFAULT_WRITING_PROMPT) setPromptText('');
+                      if (promptText === DEFAULT_WRITING_PROMPT || promptText === DEFAULT_VOCAB_PROMPT) {
+                        setPromptText('');
+                      }
                     }}
                   />
                   객관식
@@ -259,15 +297,31 @@ export default function TypesManagePage() {
                     checked={newKind === 'writing'}
                     onChange={() => {
                       setNewKind('writing');
-                      if (!promptText.trim() || promptText === DEFAULT_CUSTOM_PROMPT) {
+                      if (!promptText.trim() || promptText === DEFAULT_CUSTOM_PROMPT || promptText === DEFAULT_VOCAB_PROMPT) {
                         setPromptText(DEFAULT_WRITING_PROMPT);
                       }
                     }}
                   />
                   영작
                 </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="addKind"
+                    checked={newKind === 'vocabulary'}
+                    onChange={() => {
+                      setNewKind('vocabulary');
+                      if (!promptText.trim() || promptText === DEFAULT_CUSTOM_PROMPT || promptText === DEFAULT_WRITING_PROMPT) {
+                        setPromptText(DEFAULT_VOCAB_PROMPT);
+                      }
+                    }}
+                  />
+                  어휘
+                </label>
               </div>
-              <p className="formHint">영작은 프롬프트에 {'{passage}'}와 메인 화면 정답이 들어갈 {'{answer}'}를 모두 넣어야 합니다.</p>
+              <p className="formHint">
+                영작: {'{passage}'}, {'{answer}'} 필수 · 어휘: {'{passage}'}, {'{vocab}'} 필수(메인에서 5단어가 {'{vocab}'}로 들어갑니다)
+              </p>
             </div>
             <div className="formField">
               <label htmlFor="add-prompt">프롬프트</label>
@@ -278,7 +332,9 @@ export default function TypesManagePage() {
                 placeholder={
                   newKind === 'writing'
                     ? '비우면 영작 기본 템플릿. {passage}·{answer} 필수'
-                    : '비우면 기본 템플릿. 반드시 {passage} 포함'
+                    : newKind === 'vocabulary'
+                      ? '비우면 어휘 기본 템플릿. {passage}·{vocab} 필수'
+                      : '비우면 기본 템플릿. 반드시 {passage} 포함'
                 }
                 style={{ minHeight: 160, fontFamily: 'var(--font-dmono), monospace', fontSize: '0.82rem' }}
               />
@@ -341,7 +397,9 @@ export default function TypesManagePage() {
                     checked={editKind === 'mcq'}
                     onChange={() => {
                       setEditKind('mcq');
-                      if (editPrompt === DEFAULT_WRITING_PROMPT) setEditPrompt('');
+                      if (editPrompt === DEFAULT_WRITING_PROMPT || editPrompt === DEFAULT_VOCAB_PROMPT) {
+                        setEditPrompt('');
+                      }
                     }}
                   />
                   객관식
@@ -353,15 +411,29 @@ export default function TypesManagePage() {
                     checked={editKind === 'writing'}
                     onChange={() => {
                       setEditKind('writing');
-                      if (!editPrompt.trim() || editPrompt === DEFAULT_CUSTOM_PROMPT) {
+                      if (!editPrompt.trim() || editPrompt === DEFAULT_CUSTOM_PROMPT || editPrompt === DEFAULT_VOCAB_PROMPT) {
                         setEditPrompt(DEFAULT_WRITING_PROMPT);
                       }
                     }}
                   />
                   영작
                 </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="editKind"
+                    checked={editKind === 'vocabulary'}
+                    onChange={() => {
+                      setEditKind('vocabulary');
+                      if (!editPrompt.trim() || editPrompt === DEFAULT_CUSTOM_PROMPT || editPrompt === DEFAULT_WRITING_PROMPT) {
+                        setEditPrompt(DEFAULT_VOCAB_PROMPT);
+                      }
+                    }}
+                  />
+                  어휘
+                </label>
               </div>
-              <p className="formHint">영작으로 바꾸면 프롬프트에 {'{answer}'}가 있는지 확인하세요.</p>
+              <p className="formHint">영작은 {'{answer}'}, 어휘는 {'{vocab}'} 포함 여부를 확인하세요.</p>
             </div>
             <div className="formField">
               <label htmlFor="edit-prompt">프롬프트</label>

@@ -138,6 +138,133 @@ header {
   background: var(--border);
 }
 
+.typesBulkBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.typesBulkBtn {
+  margin-bottom: 0 !important;
+}
+
+.dragHint {
+  font-size: 0.78rem;
+  color: var(--text2);
+  line-height: 1.45;
+  margin: 0 0 14px;
+}
+
+.typesDropColumn {
+  border-radius: 12px;
+  padding: 10px 10px 4px;
+  margin-bottom: 4px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.typesDropColumnActive {
+  border-color: var(--accent);
+  background: rgba(232, 200, 125, 0.06);
+}
+
+.typesDropZoneEmpty {
+  grid-column: 1 / -1;
+  font-size: 0.82rem;
+  color: var(--text2);
+  padding: 16px 12px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.typeDragHandle {
+  flex-shrink: 0;
+  width: 32px;
+  min-height: 100%;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  cursor: grab;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  font-family: var(--font-dmono), monospace;
+}
+
+.typeDragHandle:active {
+  cursor: grabbing;
+}
+
+.typeCardShellCustom.typeCardShellActive .typeDragHandle {
+  border-right-color: rgba(232, 200, 125, 0.35);
+  background: rgba(232, 200, 125, 0.08);
+}
+
+.vocabSectionHint {
+  font-size: 0.8rem;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: -6px 0 12px;
+}
+
+.vocabWordsRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 720px) {
+  .vocabWordsRow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.vocabWordCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vocabWordLabel {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  text-transform: uppercase;
+}
+
+.vocabWordInput {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 0.86rem;
+  outline: none;
+  font-family: var(--font-dmono), monospace;
+}
+
+.vocabWordInput:focus {
+  border-color: rgba(232, 200, 125, 0.4);
+}
+
+.vocabBuiltinTag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--text2);
+  letter-spacing: 0.04em;
+}
+
 .typesSubLabel {
   font-size: 0.72rem;
   font-weight: 600;
@@ -178,6 +305,11 @@ header {
 .typesKindBadgeWriting {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.typesKindBadgeVocab {
+  border-color: var(--accent2);
+  color: var(--accent2);
 }
 
 .apiRow {

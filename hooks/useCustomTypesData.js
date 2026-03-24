@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_CUSTOM_PROMPT, DEFAULT_WRITING_PROMPT, getTypeKind } from '@/lib/defaultPrompts';
+import { defaultCustomPromptForKind, getTypeKind } from '@/lib/defaultPrompts';
 import {
   loadCustomTypes,
   loadPromptsPartial,
@@ -11,7 +11,7 @@ import {
 } from '@/lib/quizforgeStorage';
 
 function defaultPromptForType(c) {
-  return getTypeKind(c) === 'writing' ? DEFAULT_WRITING_PROMPT : DEFAULT_CUSTOM_PROMPT;
+  return defaultCustomPromptForKind(getTypeKind(c));
 }
 
 function buildPromptsMap(types, mergedPartial) {

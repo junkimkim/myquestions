@@ -1,92 +1,102 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { defaultCustomPromptForKind, getTypeKind } from '@/lib/defaultPrompts';
-import {
-  loadCustomTypes,
-  loadPromptsPartial,
-  mergeCustomTypesFromSources,
-  saveCustomTypes,
-  savePromptsPartial,
-} from '@/lib/quizforgeStorage';
-
-function defaultPromptForType(c) {
-  return defaultCustomPromptForKind(getTypeKind(c));
-}
-
-function buildPromptsMap(types, mergedPartial) {
-  const merged = { ...(mergedPartial || {}) };
-  const out = {};
-  for (const c of types) {
-    out[c.id] = merged[c.id] ?? defaultPromptForType(c);
-  }
-  return out;
-}
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export function useCustomTypesData() {
   const [customTypes, setCustomTypes] = useState([]);
   const [prompts, setPrompts] = useState({});
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const hydratedRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const lsTypes = loadCustomTypes();
-      const lsPartial = loadPromptsPartial() || {};
-
-      let seedTypes = [];
-      let seedPrompts = {};
-      try {
-        const [tRes, pRes] = await Promise.all([
-          fetch('/seed/customTypes.json', { cache: 'no-store' }),
-          fetch('/seed/customPrompts.json', { cache: 'no-store' }),
-        ]);
-        if (tRes.ok) {
-          const j = await tRes.json();
-          if (Array.isArray(j)) seedTypes = j;
-        }
-        if (pRes.ok) {
-          const j = await pRes.json();
-          if (j && typeof j === 'object' && j !== null) seedPrompts = j;
-        }
-      } catch {
-        /* ignore */
+  const reload = useCallback(async () => {
+    try {
+      const res = await fetch('/api/custom-types', { cache: 'no-store' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoadError(data.error || `불러오기 실패 (${res.status})`);
+        setCustomTypes([]);
+        setPrompts({});
+        hydratedRef.current = true;
+        setReady(true);
+        return;
       }
-
-      if (cancelled) return;
-
-      const types = mergeCustomTypesFromSources(seedTypes, lsTypes);
-      const mergedPartial = { ...seedPrompts, ...lsPartial };
-      const promptsMap = buildPromptsMap(types, mergedPartial);
-
-      setCustomTypes(types);
-      setPrompts(promptsMap);
+      setLoadError(null);
+      setCustomTypes(Array.isArray(data.types) ? data.types : []);
+      setPrompts(data.prompts && typeof data.prompts === 'object' ? data.prompts : {});
       hydratedRef.current = true;
       setReady(true);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+      setCustomTypes([]);
+      setPrompts({});
+      hydratedRef.current = true;
+      setReady(true);
+    }
   }, []);
 
   useEffect(() => {
-    if (!hydratedRef.current) return;
-    savePromptsPartial(prompts);
-  }, [prompts]);
+    reload();
+  }, [reload]);
 
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    saveCustomTypes(customTypes);
-  }, [customTypes]);
+  const removeCustomType = useCallback(
+    async (id) => {
+      const res = await fetch(`/api/custom-types/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) await reload();
+      return res;
+    },
+    [reload],
+  );
+
+  const updateCustomType = useCallback(
+    async (id, patch) => {
+      const res = await fetch(`/api/custom-types/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) await reload();
+      return res;
+    },
+    [reload],
+  );
+
+  const createCustomType = useCallback(
+    async (payload) => {
+      const res = await fetch('/api/custom-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) await reload();
+      return res;
+    },
+    [reload],
+  );
+
+  const bulkUpsertPrompts = useCallback(
+    async (items) => {
+      const res = await fetch('/api/custom-types', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      });
+      if (res.ok) await reload();
+      return res;
+    },
+    [reload],
+  );
 
   return {
     customTypes,
-    setCustomTypes,
     prompts,
     setPrompts,
+    removeCustomType,
+    updateCustomType,
+    createCustomType,
+    bulkUpsertPrompts,
+    reload,
+    loadError,
     ready,
   };
 }

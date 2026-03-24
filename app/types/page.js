@@ -12,7 +12,15 @@ import QuizForgeNav from '@/components/QuizForgeNav';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 
 export default function TypesManagePage() {
-  const { customTypes, setCustomTypes, prompts, setPrompts, ready } = useCustomTypesData();
+  const {
+    customTypes,
+    prompts,
+    removeCustomType,
+    updateCustomType,
+    createCustomType,
+    ready,
+    loadError,
+  } = useCustomTypesData();
   const isDev = process.env.NODE_ENV === 'development';
 
   const [name, setName] = useState('');
@@ -96,12 +104,17 @@ export default function TypesManagePage() {
 
     const storedKind =
       editKind === 'writing' ? 'writing' : editKind === 'vocabulary' ? 'vocabulary' : 'mcq';
-    setCustomTypes((prev) =>
-      prev.map((t) =>
-        t.id === editId ? { ...t, name: n, desc: editDesc.trim() || '사용자 정의 유형', kind: storedKind } : t,
-      ),
-    );
-    setPrompts((prev) => ({ ...prev, [editId]: prompt }));
+    const patchRes = await updateCustomType(editId, {
+      name: n,
+      desc: editDesc.trim() || '사용자 정의 유형',
+      kind: storedKind,
+      prompt,
+    });
+    if (!patchRes.ok) {
+      const errData = await patchRes.json().catch(() => ({}));
+      setEditError(errData.error || '저장에 실패했습니다.');
+      return;
+    }
 
     if (isDev && editExampleFile) {
       const fd = new FormData();
@@ -120,7 +133,7 @@ export default function TypesManagePage() {
 
     setEditOk('저장했습니다.');
     setTimeout(() => closeEditModal(), 600);
-  }, [editId, editName, editDesc, editKind, editPrompt, editExampleFile, isDev, setCustomTypes, setPrompts, closeEditModal]);
+  }, [editId, editName, editDesc, editKind, editPrompt, editExampleFile, isDev, updateCustomType, closeEditModal]);
 
   const addType = useCallback(async () => {
     setFormError('');
@@ -158,12 +171,23 @@ export default function TypesManagePage() {
     const storedKind =
       newKind === 'writing' ? 'writing' : newKind === 'vocabulary' ? 'vocabulary' : 'mcq';
 
-    setCustomTypes((prev) => [...prev, { id, name: n, desc: desc.trim() || '사용자 정의 유형', kind: storedKind }]);
-    setPrompts((prev) => ({ ...prev, [id]: prompt }));
+    const createRes = await createCustomType({
+      id,
+      name: n,
+      desc: desc.trim() || '사용자 정의 유형',
+      kind: storedKind,
+      prompt,
+    });
+    const createData = await createRes.json().catch(() => ({}));
+    if (!createRes.ok) {
+      setFormError(createData.error || '유형 추가에 실패했습니다.');
+      return;
+    }
+    const newId = createData.id || id;
 
     if (isDev && exampleFile) {
       const fd = new FormData();
-      fd.append('typeId', id);
+      fd.append('typeId', newId);
       fd.append('file', exampleFile);
       const res = await fetch('/api/custom-type-example', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
@@ -175,32 +199,27 @@ export default function TypesManagePage() {
       setFormOk(`유형을 추가하고 예시 이미지를 저장했습니다. (${data.path || ''})`);
     } else if (!isDev && exampleFile) {
       setFormOk(
-        `유형을 추가했습니다. 유형 ID: ${id} — 선택한 이미지를 저장소에 public/custom-type-examples/${id}.png (또는 jpg/webp/gif)로 복사한 뒤 커밋·배포하세요.`,
+        `유형을 추가했습니다. 유형 ID: ${newId} — 선택한 이미지를 저장소에 public/custom-type-examples/${newId}.png (또는 jpg/webp/gif)로 복사한 뒤 커밋·배포하세요.`,
       );
     } else {
       setFormOk(
-        `유형을 추가했습니다. 유형 ID: ${id} — 예시 이미지는 public/custom-type-examples/${id}.png 등 파일명으로 프로젝트에 넣을 수 있습니다.`,
+        `유형을 추가했습니다. 유형 ID: ${newId} — 예시 이미지는 public/custom-type-examples/${newId}.png 등 파일명으로 프로젝트에 넣을 수 있습니다.`,
       );
     }
 
     resetForm();
-  }, [name, desc, newKind, promptText, exampleFile, isDev, setCustomTypes, setPrompts, resetForm]);
+  }, [name, desc, newKind, promptText, exampleFile, isDev, createCustomType, resetForm]);
 
   const removeType = useCallback(
     async (id) => {
       if (!window.confirm('이 유형과 프롬프트를 삭제할까요?')) return;
-      setCustomTypes((prev) => prev.filter((c) => c.id !== id));
-      setPrompts((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
+      await removeCustomType(id);
       if (editId === id) closeEditModal();
       if (isDev) {
         await fetch(`/api/custom-type-example?typeId=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
       }
     },
-    [isDev, setCustomTypes, setPrompts, editId, closeEditModal],
+    [isDev, removeCustomType, editId, closeEditModal],
   );
 
   return (
@@ -218,6 +237,12 @@ export default function TypesManagePage() {
         <p className="subtitle">불러오는 중…</p>
       ) : (
         <>
+          {loadError && (
+            <p className="persistMsg persistMsgErr" style={{ marginBottom: 16 }}>
+              Supabase 연결 오류: {loadError}. <code>.env.local</code>에 URL·SERVICE_ROLE_KEY를 확인하고, SQL 마이그레이션을
+              실행했는지 확인하세요.
+            </p>
+          )}
           <div className="sectionLabel">등록된 유형 ({customTypes.length})</div>
           {customTypes.length === 0 ? (
             <p className="typesEmptyHint">아래 폼에서 첫 유형을 추가하세요.</p>

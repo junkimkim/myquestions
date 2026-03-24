@@ -85,12 +85,20 @@ function IconAlert(props) {
 }
 
 export default function Home() {
-  const { customTypes, setCustomTypes, prompts, setPrompts, ready } = useCustomTypesData();
+  const {
+    customTypes,
+    prompts,
+    ready,
+    loadError,
+    updateCustomType,
+    bulkUpsertPrompts,
+  } = useCustomTypesData();
   const [apiKey, setApiKey] = useState('');
   const [passage, setPassage] = useState('');
   const [vocabWords, setVocabWords] = useState(['', '', '', '', '']);
   const [writingAnswer, setWritingAnswer] = useState('');
   const [paraphraseEnabled, setParaphraseEnabled] = useState(false);
+  const [gptModel, setGptModel] = useState('gpt-5-mini');
   const [activeTypes, setActiveTypes] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [promptDrafts, setPromptDrafts] = useState({});
@@ -103,12 +111,11 @@ export default function Home() {
   const [dropTargetKind, setDropTargetKind] = useState(null);
   const dragTypeIdRef = useRef(null);
 
-  const customTypeIdsKey = useMemo(() => customTypes.map((t) => t.id).join('|'), [customTypes]);
-
   useEffect(() => {
     if (!ready) return;
-    setActiveTypes([...customTypes.map((t) => t.id)]);
-  }, [ready, customTypeIdsKey]);
+    const validIds = new Set(customTypes.map((t) => t.id));
+    setActiveTypes((prev) => prev.filter((id) => validIds.has(id)));
+  }, [ready, customTypes]);
 
   const typeIds = useMemo(() => customTypes.map((c) => c.id), [customTypes]);
 
@@ -151,7 +158,7 @@ export default function Home() {
   }, []);
 
   const handleColumnDrop = useCallback(
-    (targetKind) => (e) => {
+    (targetKind) => async (e) => {
       e.preventDefault();
       setDropTargetKind(null);
       const id = dragTypeIdRef.current || e.dataTransfer.getData('text/plain');
@@ -161,27 +168,27 @@ export default function Home() {
       if (!row) return;
       const current = getTypeKind(row);
       if (current === targetKind) return;
-      const nextKind =
-        targetKind === 'writing' ? 'writing' : targetKind === 'vocabulary' ? 'vocabulary' : 'mcq';
-      setCustomTypes((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, kind: nextKind } : t)),
-      );
+
+      const p = prompts[id] || '';
       if (targetKind === 'writing') {
-        setPrompts((prev) => {
-          const p = prev[id] || '';
-          if (p.includes('{answer}')) return prev;
-          return { ...prev, [id]: DEFAULT_WRITING_PROMPT };
-        });
+        if (!p.includes('{answer}')) {
+          await updateCustomType(id, { kind: 'writing', prompt: DEFAULT_WRITING_PROMPT });
+        } else {
+          await updateCustomType(id, { kind: 'writing' });
+        }
+        return;
       }
       if (targetKind === 'vocabulary') {
-        setPrompts((prev) => {
-          const p = prev[id] || '';
-          if (p.includes('{vocab}') && p.includes('{passage}')) return prev;
-          return { ...prev, [id]: DEFAULT_VOCAB_PROMPT };
-        });
+        if (!p.includes('{vocab}') || !p.includes('{passage}')) {
+          await updateCustomType(id, { kind: 'vocabulary', prompt: DEFAULT_VOCAB_PROMPT });
+        } else {
+          await updateCustomType(id, { kind: 'vocabulary' });
+        }
+        return;
       }
+      await updateCustomType(id, { kind: 'mcq' });
     },
-    [customTypes, setCustomTypes, setPrompts],
+    [customTypes, prompts, updateCustomType],
   );
 
   const mcqTypes = useMemo(
@@ -230,10 +237,17 @@ export default function Home() {
 
   const closeModal = useCallback(() => setModalOpen(false), []);
 
-  const savePromptsFromModal = useCallback(() => {
-    setPrompts({ ...promptDrafts });
-    setModalOpen(false);
-  }, [promptDrafts, setPrompts]);
+  const savePromptsFromModal = useCallback(async () => {
+    const items = customTypes.map((c) => ({
+      id: c.id,
+      name: c.name,
+      desc: c.desc || '',
+      kind: getTypeKind(c),
+      prompt: promptDrafts[c.id] ?? '',
+    }));
+    const res = await bulkUpsertPrompts(items);
+    if (res.ok) setModalOpen(false);
+  }, [customTypes, promptDrafts, bulkUpsertPrompts]);
 
   const resetPrompts = useCallback(() => {
     const next = {};
@@ -414,7 +428,7 @@ export default function Home() {
             .replace(/\{vocab\}/g, formatVocabList(wordsTrim));
           const out = await runOne({
             apiKey: key,
-            model: 'gpt-4o',
+            model: gptModel,
             messages: [
               {
                 role: 'system',
@@ -438,7 +452,7 @@ export default function Home() {
         const maxTokens = paraphraseEnabled ? MAX_TOKENS_WITH_PARAPHRASE : MAX_TOKENS_DEFAULT;
         const out = await runOne({
           apiKey: key,
-          model: 'gpt-4o',
+          model: gptModel,
           messages: [
             {
               role: 'system',
@@ -474,6 +488,7 @@ export default function Home() {
     vocabWords,
     writingAnswer,
     paraphraseEnabled,
+    gptModel,
     activeTypes,
     prompts,
     showError,
@@ -625,6 +640,11 @@ export default function Home() {
         <p className="subtitle">불러오는 중…</p>
       ) : (
         <>
+          {loadError && (
+            <p className="persistMsg persistMsgErr" style={{ marginBottom: 16 }}>
+              문제 유형을 불러오지 못했습니다: {loadError}
+            </p>
+          )}
           <div className="sectionLabel">API 설정</div>
           <div className="apiRow">
             <IconKey />
@@ -693,19 +713,50 @@ export default function Home() {
             </>
           )}
 
-          <div className="paraphraseRow">
-            <input
-              id="paraphrase-check"
-              type="checkbox"
-              checked={paraphraseEnabled}
-              onChange={(e) => setParaphraseEnabled(e.target.checked)}
-            />
-            <label htmlFor="paraphrase-check" className="paraphraseLabel">
-              <span className="paraphraseTitle">Paraphraze</span>
-              <span className="paraphraseHint">
-                켜면 먼저 지문을 paraphrase한 뒤, 그 결과만을 근거로 선택한 유형의 변형 문제 프롬프트가 동작합니다. (1단계 지문 Paraphrase → 2단계 문제 생성)
-              </span>
-            </label>
+          <div className="paraphraseModelRow">
+            <div className="paraphraseHalf">
+              <div className="paraphraseRow">
+                <input
+                  id="paraphrase-check"
+                  type="checkbox"
+                  checked={paraphraseEnabled}
+                  onChange={(e) => setParaphraseEnabled(e.target.checked)}
+                />
+                <label htmlFor="paraphrase-check" className="paraphraseLabel">
+                  <span className="paraphraseTitle">Paraphraze</span>
+                  <span className="paraphraseHint">
+                    켜면 먼저 지문을 paraphrase한 뒤, 그 결과만을 근거로 선택한 유형의 변형 문제 프롬프트가 동작합니다. (1단계 지문 Paraphrase → 2단계 문제 생성)
+                  </span>
+                </label>
+              </div>
+            </div>
+            <div className="modelSelectHalf">
+              <div className="modelSelectCard">
+                <label htmlFor="gpt-model" className="modelSelectLabel">
+                  GPT 모델
+                </label>
+                <select
+                  id="gpt-model"
+                  className="modelSelect"
+                  value={gptModel}
+                  onChange={(e) => setGptModel(e.target.value)}
+                >
+                  <optgroup label="GPT-5">
+                    <option value="gpt-5.1">gpt-5.1</option>
+                    <option value="gpt-5">gpt-5</option>
+                    <option value="gpt-5-mini">gpt-5-mini</option>
+                    <option value="gpt-5-nano">gpt-5-nano</option>
+                    <option value="gpt-5-chat-latest">gpt-5-chat-latest</option>
+                  </optgroup>
+                  <optgroup label="GPT-4 / 이전">
+                    <option value="gpt-4o">gpt-4o</option>
+                    <option value="gpt-4o-mini">gpt-4o-mini</option>
+                    <option value="gpt-4-turbo">gpt-4-turbo</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="sectionLabel">문제 유형 선택</div>

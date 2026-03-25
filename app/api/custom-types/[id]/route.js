@@ -4,6 +4,8 @@ import { defaultCustomPromptForKind } from '@/lib/defaultPrompts';
 
 export const dynamic = 'force-dynamic';
 
+const MCQ_CATEGORIES = new Set(['topic-title', 'comprehension', 'blank', 'order-insert', 'summary']);
+
 export async function PATCH(request, context) {
   try {
     const params = await context.params;
@@ -26,6 +28,8 @@ export async function PATCH(request, context) {
     const nextKind = ['writing', 'vocabulary', 'mcq'].includes(body.kind)
       ? body.kind
       : existing?.kind ?? (seed?.kind && ['writing', 'vocabulary'].includes(seed.kind) ? seed.kind : 'mcq');
+
+    const is_descriptive = typeof body.is_descriptive === 'boolean' ? body.is_descriptive : existing?.is_descriptive ?? false;
 
     const name =
       typeof body.name === 'string' && body.name.trim()
@@ -62,6 +66,13 @@ export async function PATCH(request, context) {
         description,
         kind: nextKind,
         prompt: String(prompt).trim(),
+        ...(nextKind === 'mcq' ? { is_descriptive } : {}),
+        ...(nextKind === 'mcq' &&
+        body.mcq_category !== undefined
+          ? MCQ_CATEGORIES.has(String(body.mcq_category).trim())
+            ? { mcq_category: String(body.mcq_category).trim() }
+            : { mcq_category: null }
+          : {}),
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'id' },

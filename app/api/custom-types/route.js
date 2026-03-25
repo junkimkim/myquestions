@@ -6,6 +6,8 @@ import { defaultCustomPromptForKind } from '@/lib/defaultPrompts';
 
 export const dynamic = 'force-dynamic';
 
+const MCQ_CATEGORIES = new Set(['topic-title', 'comprehension', 'blank', 'order-insert', 'summary']);
+
 export async function GET() {
   try {
     const supabase = createSupabaseAdmin();
@@ -41,6 +43,9 @@ export async function POST(request) {
     if (!name) return Response.json({ error: 'name 필수' }, { status: 400 });
 
     const kind = ['writing', 'vocabulary'].includes(body.kind) ? body.kind : 'mcq';
+    const is_descriptive = typeof body.is_descriptive === 'boolean' ? body.is_descriptive : false;
+    const mcqCategory =
+      typeof body.mcq_category === 'string' && MCQ_CATEGORIES.has(body.mcq_category.trim()) ? body.mcq_category.trim() : null;
     const desc = typeof body.desc === 'string' ? body.desc.trim() : '';
     const promptRaw = typeof body.prompt === 'string' ? body.prompt.trim() : '';
     const prompt = promptRaw || defaultCustomPromptForKind(kind);
@@ -55,6 +60,8 @@ export async function POST(request) {
       description: desc || '사용자 정의 유형',
       kind,
       prompt,
+      mcq_category: kind === 'mcq' ? mcqCategory : null,
+      is_descriptive,
       updated_at: new Date().toISOString(),
     });
     if (error) throw error;
@@ -84,13 +91,24 @@ export async function PUT(request) {
     for (const it of items) {
       if (!it || typeof it.id !== 'string') continue;
       const kind = ['writing', 'vocabulary'].includes(it.kind) ? it.kind : 'mcq';
+      const is_descriptive = typeof it.is_descriptive === 'boolean' ? it.is_descriptive : false;
+      const mcqCategory =
+        kind === 'mcq' &&
+        typeof it.mcq_category === 'string' &&
+        MCQ_CATEGORIES.has(it.mcq_category.trim())
+          ? it.mcq_category.trim()
+          : null;
       const name = typeof it.name === 'string' ? it.name : it.id;
       const description = typeof it.desc === 'string' ? it.desc : '';
       const prompt =
         typeof it.prompt === 'string' && it.prompt.trim()
           ? it.prompt.trim()
           : defaultCustomPromptForKind(kind);
-      rows.push({ id: it.id, name, description, kind, prompt, updated_at: now });
+      const row = { id: it.id, name, description, kind, prompt, updated_at: now };
+      // mcq_category가 없으면 기존 DB 값 유지(업서트 컬럼 생략)
+      if (kind === 'mcq' && it.mcq_category !== undefined) row.mcq_category = mcqCategory;
+      if (it.is_descriptive !== undefined) row.is_descriptive = is_descriptive;
+      rows.push(row);
     }
 
     if (rows.length > 0) {

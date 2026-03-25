@@ -58,5 +58,16 @@
         "id": "c_b3f8ba2904314bf7a6ec6b04ab5819ef",
         "name": "요약문만 만들기",
         "desc": "요약문만 만들기"
+    },
+    {
+      "id": "c_underlinedmeaning",
+      "name": "밑줄 표현 의미 추론",
+      "desc": "밑줄 친 표현이 지문에서 의미하는 바를 묻는 문제"
+    },
+    {
+      "id": "c_grammar_wrong_finder",
+      "name": "어법상 틀린 곳 찾기",
+      "desc": "밑줄 (A)~(E) 중 어법상 틀린 곳을 고르고 고치기",
+      "is_descriptive_answer": true
     }
 ]

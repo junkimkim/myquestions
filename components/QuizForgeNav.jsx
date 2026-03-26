@@ -14,6 +14,9 @@ export default function QuizForgeNav() {
       <Link href="/types" className={`appNavLink ${pathname === '/types' ? 'appNavLinkActive' : ''}`}>
         유형 관리
       </Link>
+      <Link href="/prompt" className={`appNavLink ${pathname === '/prompt' ? 'appNavLinkActive' : ''}`}>
+        프롬프트 도우미
+      </Link>
     </nav>
   );
 }

@@ -45,11 +45,86 @@ body::before {
 }
 
 .container {
-  max-width: 900px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 0 24px;
   position: relative;
   z-index: 1;
+}
+
+/* 메인: 지문·추가입력(6) | 유형 선택(4) */
+.mainWorkRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 28px;
+  margin-bottom: 28px;
+}
+
+.mainWorkColLeft {
+  flex: 6 1 0;
+  min-width: 0;
+}
+
+.mainWorkColRight {
+  flex: 4 1 0;
+  min-width: min(100%, 260px);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mainWorkColRight::-webkit-scrollbar {
+  width: 6px;
+}
+
+.mainWorkColRight::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.mainWorkColRight .typesGrid {
+  grid-template-columns: 1fr;
+}
+
+.typesBucket {
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.typesBucket:last-of-type {
+  border-bottom: none;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+
+.typesBucketTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent2);
+  margin: 0 0 6px;
+}
+
+.typesBucketHint {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 960px) {
+  .mainWorkRow {
+    flex-direction: column;
+  }
+
+  .mainWorkColLeft,
+  .mainWorkColRight {
+    flex: 1 1 auto;
+    max-width: 100%;
+    max-height: none;
+    overflow-y: visible;
+  }
 }
 
 .appNav {
@@ -547,6 +622,118 @@ header {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface2);
+}
+
+.globalPassageConfig {
+  margin-top: 8px;
+  margin-bottom: 10px;
+}
+
+.globalPassageHint {
+  font-size: 0.78rem;
+  color: var(--text2);
+  line-height: 1.45;
+  margin: 0 0 12px;
+}
+
+.typeSupplementZone {
+  margin-bottom: 22px;
+}
+
+.typeSupplementStackWrap {
+  margin-top: 4px;
+}
+
+.typeSupplementStackItem + .typeSupplementStackItem {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.supplementStackHead {
+  margin-bottom: 10px;
+}
+
+.supplementStackName {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.typeSupplementCard {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.supplementFocusMeta {
+  font-size: 0.8rem;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+
+.supplementFocusName {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.countAdjustRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 10px;
+}
+
+.countAdjustRow .btnSm {
+  flex-shrink: 0;
+}
+
+.countAdjustRowMeta {
+  font-size: 0.85rem;
+  color: var(--text2);
+  font-weight: 700;
+}
+
+.grammarWrongNHint {
+  font-size: 0.76rem;
+  color: var(--text2);
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+
+.grammarWrongNChoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 18px;
+  margin-bottom: 4px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.grammarWrongNChoiceLabel {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-right: 4px;
+}
+
+.grammarWrongNRadio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.grammarWrongNRadio input {
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .typesActions {
@@ -1423,6 +1610,172 @@ body {
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
+}
+
+/* /prompt — 프롬프트 도우미 채팅 */
+.promptApiRow {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.promptApiFields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.promptApiKeyInput {
+  flex: 1;
+  min-width: 200px;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font-dmono), monospace;
+  font-size: 0.82rem;
+  color: var(--text2);
+  letter-spacing: 0.5px;
+}
+
+.promptApiKeyInput::placeholder {
+  color: #3a4060;
+}
+
+.promptModelSelect {
+  width: auto;
+  min-width: 160px;
+}
+
+.promptApiNote {
+  font-size: 0.72rem;
+  color: var(--text2);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.promptChatShell {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 48px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.promptChatLog {
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.promptChatEmpty {
+  font-size: 0.82rem;
+  color: var(--text2);
+  line-height: 1.5;
+  margin: 8px 0;
+}
+
+.promptChatMsg {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.promptChatMsg--user {
+  align-items: flex-end;
+}
+
+.promptChatMsg--user .promptChatBody {
+  background: rgba(125, 184, 232, 0.12);
+  border: 1px solid rgba(125, 184, 232, 0.25);
+}
+
+.promptChatMsg--assistant .promptChatBody {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+}
+
+.promptChatMsgPending .promptChatBody {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text2);
+  font-size: 0.85rem;
+}
+
+.promptChatRole {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+
+.promptChatBody {
+  max-width: 100%;
+  width: fit-content;
+  max-width: min(100%, 720px);
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.promptChatError {
+  padding: 10px 18px;
+  font-size: 0.82rem;
+  color: var(--danger);
+  background: rgba(232, 125, 125, 0.08);
+  border-top: 1px solid rgba(232, 125, 125, 0.2);
+}
+
+.promptChatComposer {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px;
+  background: var(--surface2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.promptChatTextarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  font-family: inherit;
+  outline: none;
+}
+
+.promptChatTextarea:focus {
+  border-color: rgba(232, 200, 125, 0.4);
+}
+
+.promptChatTextarea:disabled {
+  opacity: 0.65;
+}
+
+.promptChatActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 640px) {

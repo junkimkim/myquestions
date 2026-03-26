@@ -20,6 +20,10 @@ import { formatVocabList } from '@/lib/vocabPrompt';
 import { withStandardOutputFormat } from '@/lib/standardOutputFormat';
 
 const GRAMMAR_WRONG_FINDER_TYPE_ID = 'c_grammar_wrong_finder';
+/** 테이블 유형: 지문상 표현 5칸만 필요(기호·고쳐 쓰기·서술형 추가 블록 없음) */
+const GRAMMAR_EXPRS_ONLY_TYPE_ID = 'c_ecfd806caa744af8ac1bfcc48744c31e';
+/** 테이블 유형: 어법 계열이어도 지문상 표현 5칸은 사용하지 않음 */
+const GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID = 'c_5927a2a3636d4920acea6b4a8654c5f0';
 /** 어법상 틀린 곳 찾기(객관식): 지문에 넣을 틀린 밑줄 개수 — UI에서는 1 또는 2만 선택 */
 const GRAMMAR_WRONG_SPOT_MAX = 2;
 
@@ -58,6 +62,26 @@ function isGrammarWrongFinderType(typeId, customTypes, prompts) {
   if (row?.id === GRAMMAR_WRONG_FINDER_TYPE_ID) return true;
   if (promptHasGrammarExprs(prompts, typeId)) return true;
   return rowLooksLikeGrammarWrongFinder(row);
+}
+
+function isGrammarExprsOnlyType(typeId) {
+  return typeId === GRAMMAR_EXPRS_ONLY_TYPE_ID;
+}
+
+/** 지문상 표현 5칸을 프롬프트·검증에 쓸지 — 특정 ID는 제외/전용 */
+function grammarNeedsPassageExprsFive(typeId, customTypes, prompts) {
+  if (typeId === GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID) return false;
+  if (isGrammarExprsOnlyType(typeId)) return true;
+  return isGrammarWrongFinderType(typeId, customTypes, prompts);
+}
+
+/** 기호·고쳐 쓰기 또는 {answer_count} 서술 블록 등 “전체 어법 보조 UI”가 필요한지 */
+function grammarNeedsFullSupplementBlocks(typeId, customTypes, prompts) {
+  return isGrammarWrongFinderType(typeId, customTypes, prompts) && !isGrammarExprsOnlyType(typeId);
+}
+
+function isResetOnEnterAnswerCountType(typeId) {
+  return typeId === GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID;
 }
 
 function getTypeGroup(c) {
@@ -167,8 +191,10 @@ export default function Home() {
   const [grammarWrongLetters, setGrammarWrongLetters] = useState(['B', 'C', 'D', 'E']);
   const [grammarWrongCorrections, setGrammarWrongCorrections] = useState(['', '', '', '']);
   const [descriptiveAnswerText, setDescriptiveAnswerText] = useState('');
-  const [descriptiveAnswerCount, setDescriptiveAnswerCount] = useState(2);
-  const [descriptiveAnswerEntries, setDescriptiveAnswerEntries] = useState(['', '']);
+  const [descriptiveAnswerCount, setDescriptiveAnswerCount] = useState(1);
+  const [descriptiveAnswerEntries, setDescriptiveAnswerEntries] = useState(['']);
+  const [specialDescriptiveAnswerCount, setSpecialDescriptiveAnswerCount] = useState(1);
+  const [specialDescriptiveAnswerEntries, setSpecialDescriptiveAnswerEntries] = useState(['']);
   const [supplementFocusTypeId, setSupplementFocusTypeId] = useState(null);
 
   useEffect(() => {
@@ -182,6 +208,12 @@ export default function Home() {
       setSupplementFocusTypeId(null);
     }
   }, [activeTypes, supplementFocusTypeId]);
+
+  useEffect(() => {
+    if (supplementFocusTypeId !== GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID) return;
+    setSpecialDescriptiveAnswerCount(1);
+    setSpecialDescriptiveAnswerEntries(['']);
+  }, [supplementFocusTypeId]);
 
   useEffect(() => {
     setGrammarWrongCount((c) => clampGrammarWrongSpotCount(c));
@@ -309,6 +341,7 @@ export default function Home() {
       const kind = getTypeKind(c);
       if (kind === 'vocabulary' || kind === 'writing') return true;
       if (promptRequiresUnderlined(typeId)) return true;
+      if (grammarNeedsPassageExprsFive(typeId, customTypes, prompts)) return true;
       if (isGrammarWrongFinderType(typeId, customTypes, prompts)) return true;
       if (c.is_descriptive) return true;
       if (isAwkwardWordMcqType(c) && kind === 'mcq') return true;
@@ -345,6 +378,30 @@ export default function Home() {
     }
     return lines.join('\n');
   }, [grammarWrongCount, grammarWrongLetters, grammarWrongCorrections]);
+
+  const getAnswerCountValueForType = useCallback(
+    (typeId) =>
+      Math.max(
+        1,
+        Math.min(
+          4,
+          Number(
+            isResetOnEnterAnswerCountType(typeId)
+              ? specialDescriptiveAnswerCount
+              : descriptiveAnswerCount,
+          ) || 1,
+        ),
+      ),
+    [descriptiveAnswerCount, specialDescriptiveAnswerCount],
+  );
+
+  const getAnswerEntriesForType = useCallback(
+    (typeId) =>
+      isResetOnEnterAnswerCountType(typeId)
+        ? specialDescriptiveAnswerEntries
+        : descriptiveAnswerEntries,
+    [descriptiveAnswerEntries, specialDescriptiveAnswerEntries],
+  );
 
   const toggleType = useCallback((type) => {
     setActiveTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
@@ -461,7 +518,7 @@ export default function Home() {
     }
 
     const anyActiveNeedsGrammarExprs = customActive.some((id) =>
-      isGrammarWrongFinderType(id, customTypes, prompts),
+      grammarNeedsPassageExprsFive(id, customTypes, prompts),
     );
     if (anyActiveNeedsGrammarExprs && grammarExprsTrim.some((w) => !w)) {
       showError(
@@ -491,16 +548,25 @@ export default function Home() {
       return;
     }
 
-    const grammarActiveIds = customActive.filter((id) => isGrammarWrongFinderType(id, customTypes, prompts));
+    const grammarActiveIds = customActive.filter((id) =>
+      grammarNeedsFullSupplementBlocks(id, customTypes, prompts),
+    );
     const grammarActive = grammarActiveIds.length > 0;
     const grammarUsesAnswerCount = grammarActiveIds.some((id) => promptHasAnswerCount(prompts, id));
     if (grammarActive) {
       if (grammarUsesAnswerCount) {
-        const n = Math.max(1, Math.min(4, Number(descriptiveAnswerCount) || 1));
-        const entries = descriptiveAnswerEntries.slice(0, n).map((v) => String(v ?? '').trim());
-        if (entries.some((x) => !x)) {
-          showError('서술형( {answer_count} ) 유형: 정답 항목을 1개씩 모두 입력해 주세요.');
-          return;
+        const idsNeedingAnswerCount = grammarActiveIds.filter((id) =>
+          promptHasAnswerCount(prompts, id),
+        );
+        for (const id of idsNeedingAnswerCount) {
+          const n = getAnswerCountValueForType(id);
+          const entries = getAnswerEntriesForType(id)
+            .slice(0, n)
+            .map((v) => String(v ?? '').trim());
+          if (entries.some((x) => !x)) {
+            showError('서술형( {answer_count} ) 유형: 정답 항목을 1개씩 모두 입력해 주세요.');
+            return;
+          }
         }
       } else {
         const n = clampGrammarWrongSpotCount(grammarWrongCount);
@@ -527,7 +593,7 @@ export default function Home() {
     }
 
     const otherDescriptiveNeedingSingleAnswer = customActive.some((id) => {
-      if (isGrammarWrongFinderType(id, customTypes, prompts)) return false;
+      if (grammarNeedsFullSupplementBlocks(id, customTypes, prompts)) return false;
       const row = customTypes.find((x) => x.id === id);
       if (!row || !row.is_descriptive) return false;
       return !promptHasAnswerCount(prompts, id);
@@ -611,10 +677,15 @@ export default function Home() {
       const isDescriptiveType = Boolean(typeRow?.is_descriptive);
       if (isDescriptiveType) {
         const needsAnswerCount = String(promptTemplate).includes('{answer_count}');
-        const n = Math.max(1, Math.min(4, Number(descriptiveAnswerCount) || 1));
+        const n = getAnswerCountValueForType(type);
+        const answerEntriesForType = getAnswerEntriesForType(type);
         const answerForThisType = needsAnswerCount
-          ? descriptiveAnswerEntries.slice(0, n).map((v) => String(v ?? '').trim()).join('\n').trim()
-          : isGrammarWrongFinderType(type, customTypes, prompts)
+          ? answerEntriesForType
+              .slice(0, n)
+              .map((v) => String(v ?? '').trim())
+              .join('\n')
+              .trim()
+          : grammarNeedsFullSupplementBlocks(type, customTypes, prompts)
             ? grammarWrongAnswerText.trim()
             : descriptiveAnswerText.trim();
         if (!String(promptTemplate).includes('{answer}')) {
@@ -672,7 +743,7 @@ export default function Home() {
         continue;
       }
 
-      const needsGrammarExprs = isGrammarWrongFinderType(type, customTypes, prompts);
+      const needsGrammarExprs = grammarNeedsPassageExprsFive(type, customTypes, prompts);
       if (needsGrammarExprs && grammarExprsTrim.some((w) => !w)) {
         setResults((prev) => ({
           ...prev,
@@ -701,7 +772,7 @@ export default function Home() {
           if (String(promptTemplate).includes('{voca}')) {
             prompt = prompt.replace(/\{voca\}/g, formatVocabList(awkwardVocaTrim));
           }
-          if (isGrammarWrongFinderType(type, customTypes, prompts)) {
+          if (grammarNeedsPassageExprsFive(type, customTypes, prompts)) {
             const ge = formatVocabList(grammarExprsTrim);
             if (String(promptTemplate).includes('{grammar_exprs}')) {
               prompt = prompt.replace(/\{grammar_exprs\}/g, ge);
@@ -732,10 +803,15 @@ export default function Home() {
         }
 
         const needsAnswerCount = String(promptTemplate).includes('{answer_count}');
-        const n = Math.max(1, Math.min(4, Number(descriptiveAnswerCount) || 1));
+        const n = getAnswerCountValueForType(type);
+        const answerEntriesForType = getAnswerEntriesForType(type);
         const answerForPrompt = needsAnswerCount
-          ? descriptiveAnswerEntries.slice(0, n).map((v) => String(v ?? '').trim()).join('\n').trim()
-          : isGrammarWrongFinderType(type, customTypes, prompts)
+          ? answerEntriesForType
+              .slice(0, n)
+              .map((v) => String(v ?? '').trim())
+              .join('\n')
+              .trim()
+          : grammarNeedsFullSupplementBlocks(type, customTypes, prompts)
             ? grammarWrongAnswerText.trim()
             : typeRow?.is_descriptive
               ? descriptiveAnswerText.trim()
@@ -745,15 +821,17 @@ export default function Home() {
         const gwSpots = clampGrammarWrongSpotCount(grammarWrongCount);
         const answerCountForPrompt = needsAnswerCount
           ? String(n)
-          : isGrammarWrongFinderType(type, customTypes, prompts)
+          : grammarNeedsFullSupplementBlocks(type, customTypes, prompts)
             ? String(gwSpots)
             : '';
         const nForPrompt =
-          isGrammarWrongFinderType(type, customTypes, prompts) && !needsAnswerCount ? String(gwSpots) : null;
+          grammarNeedsFullSupplementBlocks(type, customTypes, prompts) && !needsAnswerCount
+            ? String(gwSpots)
+            : null;
         const vocaForPrompt = String(promptTemplate).includes('{voca}')
           ? formatVocabList(awkwardVocaTrim)
           : null;
-        const grammarExprsForPrompt = isGrammarWrongFinderType(type, customTypes, prompts)
+        const grammarExprsForPrompt = grammarNeedsPassageExprsFive(type, customTypes, prompts)
           ? formatVocabList(grammarExprsTrim)
           : null;
         const prompt = buildUserPrompt(
@@ -817,6 +895,8 @@ export default function Home() {
     descriptiveAnswerText,
     descriptiveAnswerCount,
     descriptiveAnswerEntries,
+    specialDescriptiveAnswerCount,
+    specialDescriptiveAnswerEntries,
     paraphraseEnabled,
     gptModel,
     activeTypes,
@@ -1042,14 +1122,32 @@ export default function Home() {
     const showWriting = kind === 'writing';
     const showUnderlined = promptRequiresUnderlined(typeId);
     const grammarWrongFinder = isGrammarWrongFinderType(typeId, customTypes, prompts);
+    const grammarExprsOnly = isGrammarExprsOnlyType(typeId);
     /** {answer_count} 프롬프트면 서술형 다줄 UI, 아니면 기호·틀린 개수 UI */
-    const showGrammarWrongSymbolMode = grammarWrongFinder && !promptHasAnswerCount(prompts, typeId);
-    /** 어법 유형이면 항상 지문 표현 5칸({grammar_exprs}) — 레거시 {answer_count} 프롬프트에서도 노출 */
-    const showGrammarPassageExprsFive = grammarWrongFinder;
+    const showGrammarWrongSymbolMode =
+      grammarWrongFinder && !promptHasAnswerCount(prompts, typeId) && !grammarExprsOnly;
+    /** 지문 표현 5칸 — 특정 ID는 전용, 특정 ID는 제외 */
+    const showGrammarPassageExprsFive = grammarNeedsPassageExprsFive(typeId, customTypes, prompts);
     const showDescriptiveCount =
-      promptHasAnswerCount(prompts, typeId) && (Boolean(c.is_descriptive) || grammarWrongFinder);
+      promptHasAnswerCount(prompts, typeId) &&
+      (Boolean(c.is_descriptive) || grammarWrongFinder) &&
+      !grammarExprsOnly;
     const showDescriptiveSingle =
-      Boolean(c.is_descriptive) && !grammarWrongFinder && !promptHasAnswerCount(prompts, typeId);
+      Boolean(c.is_descriptive) &&
+      !grammarWrongFinder &&
+      !promptHasAnswerCount(prompts, typeId);
+    const activeAnswerCount = isResetOnEnterAnswerCountType(typeId)
+      ? specialDescriptiveAnswerCount
+      : descriptiveAnswerCount;
+    const activeAnswerEntries = isResetOnEnterAnswerCountType(typeId)
+      ? specialDescriptiveAnswerEntries
+      : descriptiveAnswerEntries;
+    const setActiveAnswerCount = isResetOnEnterAnswerCountType(typeId)
+      ? setSpecialDescriptiveAnswerCount
+      : setDescriptiveAnswerCount;
+    const setActiveAnswerEntries = isResetOnEnterAnswerCountType(typeId)
+      ? setSpecialDescriptiveAnswerEntries
+      : setDescriptiveAnswerEntries;
     const showAwkwardPassageVoca =
       kind === 'mcq' && (isAwkwardWordMcqType(c) || promptRequiresVoca(typeId));
 
@@ -1263,26 +1361,26 @@ export default function Home() {
                     type="button"
                     className="btnSm btnGhost"
                     onClick={() => {
-                      setDescriptiveAnswerCount((n) => Math.max(1, n - 1));
+                      setActiveAnswerCount((n) => Math.max(1, n - 1));
                     }}
-                    disabled={descriptiveAnswerCount <= 1}
+                    disabled={activeAnswerCount <= 1}
                   >
                     - 삭제
                   </button>
-                  <span className="countAdjustRowMeta">현재 {descriptiveAnswerCount}개</span>
+                  <span className="countAdjustRowMeta">현재 {activeAnswerCount}개</span>
                   <button
                     type="button"
                     className="btnSm btnGhost"
                     onClick={() => {
-                      setDescriptiveAnswerCount((n) => Math.min(4, n + 1));
+                      setActiveAnswerCount((n) => Math.min(4, n + 1));
                     }}
-                    disabled={descriptiveAnswerCount >= 4}
+                    disabled={activeAnswerCount >= 4}
                   >
                     + 추가
                   </button>
                 </div>
                 <div className="grammarWrongFinderInputs">
-                  {[0, 1, 2, 3].slice(0, descriptiveAnswerCount).map((_, i) => (
+                  {[0, 1, 2, 3].slice(0, activeAnswerCount).map((_, i) => (
                     <div key={i} className="grammarWrongFinderRow">
                       <div className="grammarWrongFinderHead">
                         <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>정답 항목 {i + 1}</span>
@@ -1291,10 +1389,10 @@ export default function Home() {
                         <textarea
                           className="vocabWordInput"
                           style={{ flex: 1, minHeight: 78, resize: 'vertical' }}
-                          value={descriptiveAnswerEntries[i] ?? ''}
+                          value={activeAnswerEntries[i] ?? ''}
                           onChange={(e) => {
                             const v = e.target.value;
-                            setDescriptiveAnswerEntries((prev) => {
+                            setActiveAnswerEntries((prev) => {
                               const next = [...prev];
                               next[i] = v;
                               return next;

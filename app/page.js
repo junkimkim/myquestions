@@ -17,7 +17,6 @@ import {
 } from '@/lib/paraphrasePrompt';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 import { formatVocabList } from '@/lib/vocabPrompt';
-import { withStandardOutputFormat } from '@/lib/standardOutputFormat';
 
 const GRAMMAR_WRONG_FINDER_TYPE_ID = 'c_grammar_wrong_finder';
 /** 테이블 유형: 지문상 표현 5칸만 필요(기호·고쳐 쓰기·서술형 추가 블록 없음) */
@@ -786,9 +785,7 @@ export default function Home() {
             messages: [
               {
                 role: 'system',
-                content: withStandardOutputFormat(
-                  '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 어휘·영영풀이 형식 지시를 정확히 따릅니다.',
-                ),
+                content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 어휘·영영풀이 형식 지시를 정확히 따릅니다.',
               },
               { role: 'user', content: prompt },
             ],
@@ -852,9 +849,7 @@ export default function Home() {
           messages: [
             {
               role: 'system',
-              content: withStandardOutputFormat(
-                '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다.',
-              ),
+              content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다.',
             },
             { role: 'user', content: prompt },
           ],

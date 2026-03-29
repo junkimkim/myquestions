@@ -297,9 +297,17 @@ header {
   margin-bottom: 28px;
 }
 
+/* 한 유형(보기 5문장 등)에서 세로 5줄로 쌓을 때 — 미디어쿼리보다 우선 */
+.vocabWordsRow.vocabWordsRowStack {
+  grid-template-columns: 1fr;
+}
+
 @media (max-width: 720px) {
   .vocabWordsRow {
     grid-template-columns: 1fr 1fr;
+  }
+  .vocabWordsRow.vocabWordsRowStack {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -331,6 +339,14 @@ header {
 
 .vocabWordInput:focus {
   border-color: rgba(232, 200, 125, 0.4);
+}
+
+/* 객관식 어법 문장형 — textarea 기본 높이를 낮게 */
+.grammarCompactTextarea {
+  min-height: 0;
+  padding: 6px 10px;
+  line-height: 1.35;
+  font-size: 0.82rem;
 }
 
 .vocabBuiltinTag {
@@ -998,6 +1014,18 @@ header {
 
 .typeCardShellCustom.typeCardShellActive .examplePreviewBtn {
   border-color: rgba(232, 200, 125, 0.35);
+}
+
+.promptEditBtn {
+  color: #6a56ff;
+  border-color: rgba(106, 86, 255, 0.28);
+  background: rgba(106, 86, 255, 0.06);
+}
+
+.promptEditBtn:hover {
+  color: #5a49e6;
+  border-color: rgba(106, 86, 255, 0.5);
+  background: rgba(106, 86, 255, 0.12);
 }
 
 .typeCardShell:not(.typeCardShellCustom).typeCardShellActive .typeCard {

@@ -6,7 +6,22 @@ import { defaultCustomPromptForKind } from '@/lib/defaultPrompts';
 
 export const dynamic = 'force-dynamic';
 
-const MCQ_CATEGORIES = new Set(['topic-title', 'comprehension', 'blank', 'order-insert', 'summary']);
+const MCQ_CATEGORIES = new Set(['topic-title', 'comprehension', 'blank', 'order-insert', 'summary', 'grammar-mcq']);
+
+function normalizeErrorMessage(e, fallback = '요청 처리 중 오류가 발생했습니다.') {
+  if (e instanceof Error && e.message) return e.message;
+  if (e && typeof e === 'object') {
+    if (typeof e.message === 'string' && e.message.trim()) return e.message;
+    if (typeof e.details === 'string' && e.details.trim()) return e.details;
+    if (typeof e.hint === 'string' && e.hint.trim()) return e.hint;
+    try {
+      const s = JSON.stringify(e);
+      if (s && s !== '{}' && s !== 'null') return s;
+    } catch {}
+  }
+  if (typeof e === 'string' && e.trim()) return e;
+  return fallback;
+}
 
 export async function GET() {
   try {
@@ -25,7 +40,7 @@ export async function GET() {
 
     return Response.json({ types, prompts });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = normalizeErrorMessage(e);
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -67,7 +82,7 @@ export async function POST(request) {
     if (error) throw error;
     return Response.json({ ok: true, id });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = normalizeErrorMessage(e);
     return Response.json({ error: message }, { status: 500 });
   }
 }
@@ -118,7 +133,7 @@ export async function PUT(request) {
 
     return Response.json({ ok: true });
   } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
+    const message = normalizeErrorMessage(e);
     return Response.json({ error: message }, { status: 500 });
   }
 }

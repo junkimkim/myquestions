@@ -69,5 +69,10 @@
       "name": "어법상 틀린 곳 찾기",
       "desc": "밑줄 (A)~(E) 중 어법상 틀린 곳을 고르고 고치기",
       "is_descriptive_answer": true
+    },
+    {
+      "id": "c_ecfd806caa744af8ac1bfcc48744c31e",
+      "name": "객관식 어법",
+      "desc": "보기 5개 중 어법상 틀린 표현을 고르는 객관식"
     }
 ]

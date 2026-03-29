@@ -13,6 +13,7 @@ import {
 import {
   MAX_TOKENS_DEFAULT,
   MAX_TOKENS_WITH_PARAPHRASE,
+  applyGrammarSlotPlaceholders,
   buildUserPrompt,
 } from '@/lib/paraphrasePrompt';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
@@ -21,6 +22,8 @@ import { formatVocabList } from '@/lib/vocabPrompt';
 const GRAMMAR_WRONG_FINDER_TYPE_ID = 'c_grammar_wrong_finder';
 /** 테이블 유형: 지문상 표현 5칸만 필요(기호·고쳐 쓰기·서술형 추가 블록 없음) */
 const GRAMMAR_EXPRS_ONLY_TYPE_ID = 'c_ecfd806caa744af8ac1bfcc48744c31e';
+/** 사용자 지정: 보기 5문장 + 틀리게 고칠 부분 입력 */
+const GRAMMAR_SENTENCE_MCQ_TYPE_ID = 'c_6dd890316e9e4a3bb1ff6c65f0e147e1';
 /** 테이블 유형: 어법 계열이어도 지문상 표현 5칸은 사용하지 않음 */
 const GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID = 'c_5927a2a3636d4920acea6b4a8654c5f0';
 /** 어법상 틀린 곳 찾기(객관식): 지문에 넣을 틀린 밑줄 개수 — UI에서는 1 또는 2만 선택 */
@@ -63,20 +66,31 @@ function isGrammarWrongFinderType(typeId, customTypes, prompts) {
   return rowLooksLikeGrammarWrongFinder(row);
 }
 
-function isGrammarExprsOnlyType(typeId) {
-  return typeId === GRAMMAR_EXPRS_ONLY_TYPE_ID;
+function isGrammarExprsOnlyType(typeId, customTypes) {
+  if (typeId === GRAMMAR_EXPRS_ONLY_TYPE_ID) return true;
+  if (typeId === GRAMMAR_SENTENCE_MCQ_TYPE_ID) return true;
+  const row = customTypes.find((x) => x.id === typeId);
+  return row?.mcq_category === 'grammar-mcq';
+}
+
+function isSentenceGrammarMcqType(typeId) {
+  return typeId === GRAMMAR_SENTENCE_MCQ_TYPE_ID;
 }
 
 /** 지문상 표현 5칸을 프롬프트·검증에 쓸지 — 특정 ID는 제외/전용 */
 function grammarNeedsPassageExprsFive(typeId, customTypes, prompts) {
   if (typeId === GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID) return false;
-  if (isGrammarExprsOnlyType(typeId)) return true;
+  if (isGrammarExprsOnlyType(typeId, customTypes)) return true;
   return isGrammarWrongFinderType(typeId, customTypes, prompts);
+}
+
+function grammarNeedsAnswerFormsFive(typeId, customTypes) {
+  return isGrammarExprsOnlyType(typeId, customTypes);
 }
 
 /** 기호·고쳐 쓰기 또는 {answer_count} 서술 블록 등 “전체 어법 보조 UI”가 필요한지 */
 function grammarNeedsFullSupplementBlocks(typeId, customTypes, prompts) {
-  return isGrammarWrongFinderType(typeId, customTypes, prompts) && !isGrammarExprsOnlyType(typeId);
+  return isGrammarWrongFinderType(typeId, customTypes, prompts) && !isGrammarExprsOnlyType(typeId, customTypes);
 }
 
 function isResetOnEnterAnswerCountType(typeId) {
@@ -171,12 +185,14 @@ export default function Home() {
   const [vocabWords, setVocabWords] = useState(['', '', '', '', '']);
   const [awkwardVocaWords, setAwkwardVocaWords] = useState(['', '', '', '', '']);
   const [grammarPassageExprs, setGrammarPassageExprs] = useState(['', '', '', '', '']);
+  const [grammarAnswerForms, setGrammarAnswerForms] = useState(['', '', '', '', '']);
   const [writingAnswer, setWritingAnswer] = useState('');
   const [paraphraseEnabled, setParaphraseEnabled] = useState(false);
   const [gptModel, setGptModel] = useState('gpt-4o');
   const [activeTypes, setActiveTypes] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [promptDrafts, setPromptDrafts] = useState({});
+  const [promptEditTypeId, setPromptEditTypeId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState({});
   const [resultOrder, setResultOrder] = useState([]);
@@ -258,6 +274,14 @@ export default function Home() {
 
   const setGrammarPassageExprAt = useCallback((index, value) => {
     setGrammarPassageExprs((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+  }, []);
+
+  const setGrammarAnswerFormAt = useCallback((index, value) => {
+    setGrammarAnswerForms((prev) => {
       const next = [...prev];
       next[index] = value;
       return next;
@@ -406,36 +430,50 @@ export default function Home() {
     setActiveTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   }, []);
 
-  const openModal = useCallback(() => {
+  const promptModalTypeIds = useMemo(() => {
+    if (!promptEditTypeId) return customTypes.map((c) => c.id);
+    return customTypes.some((c) => c.id === promptEditTypeId) ? [promptEditTypeId] : [];
+  }, [customTypes, promptEditTypeId]);
+
+  const openModal = useCallback((typeId = null) => {
     const draft = {};
     for (const c of customTypes) {
       draft[c.id] = prompts[c.id] ?? defaultCustomPromptForKind(getTypeKind(c));
     }
     setPromptDrafts(draft);
+    setPromptEditTypeId(typeId);
     setModalOpen(true);
   }, [prompts, customTypes]);
 
-  const closeModal = useCallback(() => setModalOpen(false), []);
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+    setPromptEditTypeId(null);
+  }, []);
 
   const savePromptsFromModal = useCallback(async () => {
-    const items = customTypes.map((c) => ({
+    const items = customTypes
+      .filter((c) => promptModalTypeIds.includes(c.id))
+      .map((c) => ({
       id: c.id,
       name: c.name,
       desc: c.desc || '',
       kind: getTypeKind(c),
       prompt: promptDrafts[c.id] ?? '',
-    }));
+      }));
     const res = await bulkUpsertPrompts(items);
-    if (res.ok) setModalOpen(false);
-  }, [customTypes, promptDrafts, bulkUpsertPrompts]);
+    if (res.ok) closeModal();
+  }, [customTypes, promptModalTypeIds, promptDrafts, bulkUpsertPrompts, closeModal]);
 
   const resetPrompts = useCallback(() => {
-    const next = {};
-    for (const c of customTypes) {
-      next[c.id] = defaultCustomPromptForKind(getTypeKind(c));
-    }
-    setPromptDrafts(next);
-  }, [customTypes]);
+    setPromptDrafts((prev) => {
+      const next = { ...prev };
+      for (const c of customTypes) {
+        if (!promptModalTypeIds.includes(c.id)) continue;
+        next[c.id] = defaultCustomPromptForKind(getTypeKind(c));
+      }
+      return next;
+    });
+  }, [customTypes, promptModalTypeIds]);
 
   const openExampleModal = useCallback(async (c) => {
     const title = c?.name || '유형';
@@ -489,6 +527,9 @@ export default function Home() {
     const wordsTrim = vocabWords.map((w) => w.trim());
     const awkwardVocaTrim = awkwardVocaWords.map((w) => w.trim());
     const grammarExprsTrim = grammarPassageExprs.map((w) => w.trim());
+    const grammarAnswersTrim = grammarAnswerForms.map((w) => w.trim());
+    const hasAnyGrammarAnswerInput = grammarAnswersTrim.some((w) => Boolean(w));
+    const grammarAnswerCount = grammarAnswersTrim.filter(Boolean).length;
 
     if (!key || !key.startsWith('sk-')) {
       showError('OpenAI API 키를 입력해주세요. (sk-로 시작)');
@@ -521,7 +562,16 @@ export default function Home() {
     );
     if (anyActiveNeedsGrammarExprs && grammarExprsTrim.some((w) => !w)) {
       showError(
-        '어법상 틀린 곳 찾기로 인식된 유형이 선택되어 있습니다. 해당 유형 카드를 눌러 지문상 표현 5개를 모두 입력해 주세요.',
+        '어법상 틀린 곳 찾기 계열 유형이 선택되어 있습니다. 해당 유형 카드를 눌러 보기(지문상 표현) 5개를 모두 입력해 주세요.',
+      );
+      return;
+    }
+    const anyActiveNeedsGrammarAnswerForms = customActive.some((id) =>
+      grammarNeedsAnswerFormsFive(id, customTypes),
+    );
+    if (anyActiveNeedsGrammarAnswerForms && !hasAnyGrammarAnswerInput) {
+      showError(
+        '어법상 틀린 것 찾기 (객관식) 유형이 선택되어 있습니다. 오답 형태(정답) 입력칸에 최소 1개를 입력해 주세요.',
       );
       return;
     }
@@ -750,7 +800,20 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '어법상 틀린 곳 찾기 유형입니다. 지문상 표현 5개를 모두 입력해 주세요.',
+            error: '어법상 틀린 곳 찾기 유형입니다. 보기(지문상 표현) 5개를 모두 입력해 주세요.',
+          },
+        }));
+        continue;
+      }
+      const needsGrammarAnswerForms = grammarNeedsAnswerFormsFive(type, customTypes);
+      if (needsGrammarAnswerForms && !hasAnyGrammarAnswerInput) {
+        setResults((prev) => ({
+          ...prev,
+          [type]: {
+            status: 'error',
+            label,
+            tagClass,
+            error: '어법상 틀린 것 찾기 (객관식) 유형입니다. 오답 형태(정답)를 최소 1개 입력해 주세요.',
           },
         }));
         continue;
@@ -779,6 +842,14 @@ export default function Home() {
               prompt = `[지문 밑줄 후보 표현 5개 — 교사 지정]\n${ge}\n\n${prompt}`;
             }
           }
+          if (grammarNeedsAnswerFormsFive(type, customTypes) && String(promptTemplate).includes('{grammar_answer}')) {
+            prompt = prompt.replace(/\{grammar_answer\}/g, formatVocabList(grammarAnswersTrim));
+          }
+          prompt = applyGrammarSlotPlaceholders(
+            prompt,
+            grammarNeedsPassageExprsFive(type, customTypes, prompts) ? grammarExprsTrim : null,
+            grammarNeedsAnswerFormsFive(type, customTypes) ? grammarAnswersTrim : null,
+          );
           const out = await runOne({
             apiKey: key,
             model: gptModel,
@@ -818,6 +889,8 @@ export default function Home() {
         const gwSpots = clampGrammarWrongSpotCount(grammarWrongCount);
         const answerCountForPrompt = needsAnswerCount
           ? String(n)
+          : isSentenceGrammarMcqType(type)
+            ? String(grammarAnswerCount)
           : grammarNeedsFullSupplementBlocks(type, customTypes, prompts)
             ? String(gwSpots)
             : '';
@@ -831,6 +904,15 @@ export default function Home() {
         const grammarExprsForPrompt = grammarNeedsPassageExprsFive(type, customTypes, prompts)
           ? formatVocabList(grammarExprsTrim)
           : null;
+        const grammarAnswerForPrompt = grammarNeedsAnswerFormsFive(type, customTypes)
+          ? formatVocabList(grammarAnswersTrim)
+          : null;
+        const grammarExprSlotsForPrompt = grammarNeedsPassageExprsFive(type, customTypes, prompts)
+          ? grammarExprsTrim
+          : null;
+        const grammarAnswerSlotsForPrompt = grammarNeedsAnswerFormsFive(type, customTypes)
+          ? grammarAnswersTrim
+          : null;
         const prompt = buildUserPrompt(
           text,
           promptTemplate,
@@ -841,6 +923,9 @@ export default function Home() {
           nForPrompt,
           vocaForPrompt,
           grammarExprsForPrompt,
+          grammarAnswerForPrompt,
+          grammarExprSlotsForPrompt,
+          grammarAnswerSlotsForPrompt,
         );
         const maxTokens = paraphraseEnabled ? MAX_TOKENS_WITH_PARAPHRASE : MAX_TOKENS_DEFAULT;
         const out = await runOne({
@@ -881,6 +966,7 @@ export default function Home() {
     vocabWords,
     awkwardVocaWords,
     grammarPassageExprs,
+    grammarAnswerForms,
     writingAnswer,
     underlinedStentence,
     grammarWrongCount,
@@ -1045,6 +1131,17 @@ export default function Home() {
           >
             예시 보기
           </button>
+          <button
+            type="button"
+            className="examplePreviewBtn promptEditBtn"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openModal(c.id);
+            }}
+          >
+            프롬프트
+          </button>
         </div>
       </div>
     );
@@ -1117,12 +1214,14 @@ export default function Home() {
     const showWriting = kind === 'writing';
     const showUnderlined = promptRequiresUnderlined(typeId);
     const grammarWrongFinder = isGrammarWrongFinderType(typeId, customTypes, prompts);
-    const grammarExprsOnly = isGrammarExprsOnlyType(typeId);
+    const grammarExprsOnly = isGrammarExprsOnlyType(typeId, customTypes);
+    const isSentenceGrammarMcq = isSentenceGrammarMcqType(typeId);
     /** {answer_count} 프롬프트면 서술형 다줄 UI, 아니면 기호·틀린 개수 UI */
     const showGrammarWrongSymbolMode =
       grammarWrongFinder && !promptHasAnswerCount(prompts, typeId) && !grammarExprsOnly;
     /** 지문 표현 5칸 — 특정 ID는 전용, 특정 ID는 제외 */
     const showGrammarPassageExprsFive = grammarNeedsPassageExprsFive(typeId, customTypes, prompts);
+    const showGrammarAnswerFormsFive = grammarNeedsAnswerFormsFive(typeId, customTypes);
     const showDescriptiveCount =
       promptHasAnswerCount(prompts, typeId) &&
       (Boolean(c.is_descriptive) || grammarWrongFinder) &&
@@ -1156,7 +1255,7 @@ export default function Home() {
             <p className="vocabSectionHint">
               지문과 함께 쓰면 지문에서 해당 표현을 찾아 맥락 문제로 출제합니다. 단어 5칸만 채우면 지문 없이 &quot;단어:영영풀이&quot; 형식의 5지선다 문제로 출제합니다.
             </p>
-            <div className="vocabWordsRow">
+            <div className={isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'}>
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="vocabWordCell">
                   <label className="vocabWordLabel" htmlFor={`vocab-global-${i}`}>
@@ -1241,29 +1340,87 @@ export default function Home() {
         {showGrammarPassageExprsFive && (
           <>
             <div className="sectionLabel" style={{ marginTop: 20 }}>
-              어법상 틀린 곳 찾기 — 지문상 표현 5개
+              {grammarExprsOnly ? '객관식 어법 — 보기 5개' : '어법상 틀린 곳 찾기 — 지문상 표현 5개'}
             </div>
             <p className="grammarWrongNHint">
-              지문에 실제로 나오는 밑줄 후보 표현(단어·구) 5개를 적어 주세요. 프롬프트에 {'{grammar_exprs}'}가 있으면 번호 목록으로 치환됩니다.
+              {grammarExprsOnly
+                ? `객관식 어법 문제의 보기로 사용할 표현 5개를 입력해 주세요. 프롬프트의 ${'{grammar_exprs}'}에 번호 목록으로 들어갑니다.`
+                : `지문에 실제로 나오는 밑줄 후보 표현(단어·구) 5개를 적어 주세요. 프롬프트에 ${'{grammar_exprs}'}가 있으면 번호 목록으로 치환됩니다.`}
             </p>
-            <div className="vocabWordsRow">
+            <div
+              className={
+                isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'
+              }
+            >
               {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="vocabWordCell">
                   <label className="vocabWordLabel" htmlFor={`grammar-expr-${typeId}-${i}`}>
                     {i + 1}
                   </label>
-                  <input
-                    id={`grammar-expr-${typeId}-${i}`}
-                    type="text"
-                    className="vocabWordInput"
-                    value={grammarPassageExprs[i]}
-                    onChange={(e) => setGrammarPassageExprAt(i, e.target.value)}
-                    placeholder={`지문 표현 ${i + 1}`}
-                    autoComplete="off"
-                  />
+                  {isSentenceGrammarMcq ? (
+                    <textarea
+                      id={`grammar-expr-${typeId}-${i}`}
+                      className="vocabWordInput grammarCompactTextarea"
+                      rows={1}
+                      style={{ resize: 'vertical' }}
+                      value={grammarPassageExprs[i]}
+                      onChange={(e) => setGrammarPassageExprAt(i, e.target.value)}
+                      placeholder={`보기 문장 ${i + 1}`}
+                    />
+                  ) : (
+                    <input
+                      id={`grammar-expr-${typeId}-${i}`}
+                      type="text"
+                      className="vocabWordInput"
+                      value={grammarPassageExprs[i]}
+                      onChange={(e) => setGrammarPassageExprAt(i, e.target.value)}
+                      placeholder={grammarExprsOnly ? `보기 ${i + 1}` : `지문 표현 ${i + 1}`}
+                      autoComplete="off"
+                    />
+                  )}
                 </div>
               ))}
             </div>
+            {showGrammarAnswerFormsFive && (
+              <>
+                <div className="sectionLabel" style={{ marginTop: 14 }}>
+                  객관식 어법 — 오답 5개
+                </div>
+                <p className="grammarWrongNHint">
+                  빈 칸은 보기 값으로 채우지 않습니다. 입력한 내용만 프롬프트의 {'{grammar_answer}'}에 전달됩니다. (일부 유형은 입력 개수가 {'{answer_count}'}에 반영됩니다.)
+                </p>
+                <div className="vocabWordsRow">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} className="vocabWordCell">
+                      <label className="vocabWordLabel" htmlFor={`grammar-answer-${typeId}-${i}`}>
+                        {i + 1}
+                      </label>
+                      {isSentenceGrammarMcq ? (
+                        <textarea
+                          id={`grammar-answer-${typeId}-${i}`}
+                          className="vocabWordInput grammarCompactTextarea"
+                          rows={3}
+                          style={{ resize: 'vertical' }}
+                          value={grammarAnswerForms[i]}
+                          onChange={(e) => setGrammarAnswerFormAt(i, e.target.value)}
+                          placeholder={`틀리게 고칠 부분 ${i + 1}`}
+                        />
+                      ) : (
+                        <input
+                          id={`grammar-answer-${typeId}-${i}`}
+                          type="text"
+                          className="vocabWordInput"
+                          value={grammarAnswerForms[i]}
+                          onChange={(e) => setGrammarAnswerFormAt(i, e.target.value)}
+                          placeholder={`오답 ${i + 1}`}
+                          autoComplete="off"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
 
@@ -1393,7 +1550,7 @@ export default function Home() {
                               return next;
                             });
                           }}
-                          placeholder="- 기호 ( B ) : 고쳐 쓰기 ( ... 밑줄 부분 전체 ... )"
+                          placeholder="- 정답이 되는 온전한 문장 전체를 입력하세요."
                         />
                       </div>
                     </div>
@@ -1673,13 +1830,20 @@ export default function Home() {
                 aria-modal="true"
                 aria-labelledby="modal-title"
               >
-                <h3 id="modal-title">프롬프트 설정</h3>
+                <h3 id="modal-title">
+                  {promptEditTypeId
+                    ? `프롬프트 설정 — ${getTypeInfo(promptEditTypeId, customTypes).name}`
+                    : '프롬프트 설정'}
+                </h3>
                 <p className="modalIntro">
                   각 유형별 GPT 지시문을 수정할 수 있습니다. <code>{'{passage}'}</code>는 입력 지문으로 치환됩니다(어휘 유형에서 지문 없이 생성하면 빈 문자열). 영작은 메인 정답이{' '}
                   <code>{'{answer}'}</code>, 어휘는 메인 5단어 목록이 <code>{'{vocab}'}</code>로 들어갑니다. 객관식에서{' '}
-                  <code>{'{voca}'}</code>는 문맥상 어색한 낱말용 5칸, <code>{'{grammar_exprs}'}</code>는 어법상 틀린 곳 찾기용 지문 표현 5칸과 연결됩니다.
+                  <code>{'{voca}'}</code>는 문맥상 어색한 낱말용 5칸, <code>{'{grammar_exprs}'}</code>·<code>{'{grammar_answer}'}</code>는 메인에서 입력한 보기·틀린 보기 5칸을 번호 목록 문자열로 치환합니다. 번호별로 쓰려면{' '}
+                  <code>{'{grammar_expr_1}'}</code>~<code>{'{grammar_expr_5}'}</code>, <code>{'{grammar_answer_1}'}</code>~<code>{'{grammar_answer_5}'}</code> 또는 짝 블록 <code>{'{grammar_pairs}'}</code>를 사용하세요.
                 </p>
-                {customTypes.map((c) => {
+                {customTypes
+                  .filter((c) => promptModalTypeIds.includes(c.id))
+                  .map((c) => {
                   const info = getTypeInfo(c.id, customTypes);
                   return (
                     <div key={c.id} className="promptItem">
@@ -1709,7 +1873,7 @@ export default function Home() {
                       />
                     </div>
                   );
-                })}
+                  })}
                 <div className="modalFooter">
                   <button type="button" className="btnSm btnGhost" onClick={resetPrompts}>
                     기본값으로 초기화

@@ -1811,3 +1811,168 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* /one_type — 단일 유형 · 다중 지문 */
+.oneTypeHint {
+  margin-bottom: 14px;
+}
+
+.oneTypePassageBlock {
+  margin-bottom: 18px;
+}
+
+.oneTypePassageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.oneTypePassageTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent2);
+}
+
+.oneTypeRemoveBtn {
+  flex-shrink: 0;
+}
+
+.oneTypeAddPassageBtn {
+  margin-top: 4px;
+}
+
+.oneTypeRadioList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oneTypeRadioItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--surface2);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.oneTypeRadioItem:hover {
+  border-color: rgba(232, 200, 125, 0.35);
+}
+
+.oneTypeRadioItem:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.oneTypeRadioItemActive,
+.oneTypeRadioItem:has(input:checked) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(232, 200, 125, 0.25);
+}
+
+.oneTypeRadioItem input {
+  margin-top: 4px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.oneTypeRadioMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.oneTypeRadioName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.oneTypeRadioDesc {
+  font-size: 0.78rem;
+  color: var(--text2);
+  line-height: 1.45;
+}
+
+.oneTypeResultPassageIdx {
+  font-size: 0.78rem;
+  color: var(--text2);
+  font-weight: 500;
+}
+
+/* /expected_questions */
+.expectedAccordion {
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.expectedAccordionSummary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.expectedAccordionSummary::-webkit-details-marker {
+  display: none;
+}
+
+.expectedAccordionSummary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--accent2);
+  transition: transform 0.15s ease;
+}
+details[open] > .expectedAccordionSummary::before {
+  transform: rotate(90deg);
+}
+
+.expectedAccordionNo {
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0.02em;
+}
+
+.expectedAccordionMeta {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text2);
+  flex: 1;
+  min-width: 0;
+}
+
+.expectedAccordionRemove {
+  margin-left: auto;
+}
+
+.expectedProblemInner {
+  padding: 0 16px 18px;
+  margin-top: 0;
+}
+
+.expectedQuestionsActions {
+  margin: 20px 0 16px;
+}
+
+.expectedResultHeading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}

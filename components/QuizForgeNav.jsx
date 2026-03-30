@@ -17,6 +17,15 @@ export default function QuizForgeNav() {
       <Link href="/prompt" className={`appNavLink ${pathname === '/prompt' ? 'appNavLinkActive' : ''}`}>
         프롬프트 도우미
       </Link>
+      <Link href="/one_type" className={`appNavLink ${pathname === '/one_type' ? 'appNavLinkActive' : ''}`}>
+        한 유형 일괄
+      </Link>
+      <Link
+        href="/expected_questions"
+        className={`appNavLink ${pathname === '/expected_questions' ? 'appNavLinkActive' : ''}`}
+      >
+        예상문제 세트
+      </Link>
     </nav>
   );
 }

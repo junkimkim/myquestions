@@ -1,5 +1,10 @@
 'use client';
 
+/**
+ * 유형별 추가 입력 UI — 메인(`/`)·예상문제(`/expected_questions`)가 동일 컴포넌트를 사용합니다.
+ * 문구·레이아웃 변경은 이 파일만 수정하면 됩니다.
+ */
+
 import {
   clampGrammarWrongSpotCount,
   grammarNeedsAnswerFormsFive,
@@ -12,6 +17,8 @@ import {
   promptHasAnswerCount,
   promptRequiresUnderlined,
   promptRequiresVoca,
+  getGrammarPassageExprsFiveHint,
+  getGrammarPassageExprsFiveSectionLabel,
 } from '@/lib/typeExtraInput';
 import { getTypeKind } from '@/lib/defaultPrompts';
 
@@ -72,10 +79,10 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
       {showVocab && (
         <>
           <div className="sectionLabel" style={{ marginTop: 4 }}>
-            출제 어휘 5개
+            보기 어휘 5개
           </div>
           <p className="vocabSectionHint">
-            지문과 함께 쓰면 지문에서 해당 표현을 찾아 맥락 문제로 출제합니다. 단어 5칸만 채우면 지문 없이 &quot;단어:영영풀이&quot; 형식의 5지선다 문제로 출제합니다.
+            지문에서 선택지로 만들고 싶은 어휘 5개를 입력합니다. 무작위로 보기 하나의 영영풀이를 어색하게 만들고 변형문제를 생성합니다.
           </p>
           <div className={isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'}>
             {[0, 1, 2, 3, 4].map((i) => (
@@ -101,10 +108,10 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
       {showAwkwardPassageVoca && (
         <>
           <div className="sectionLabel" style={{ marginTop: showVocab ? 20 : 4 }}>
-            지문상 어휘 5개 (문맥상 어색한 낱말)
+            어휘 보기 5개
           </div>
           <p className="vocabSectionHint">
-            지문에 실제로 나오는 단어·구를 5개 적어 주세요. 프롬프트의 {'{voca}'}에 번호 목록으로 들어갑니다.
+            지문에 보기로 만들고 싶은 단어를 5개 입력하세요. 무작위로 단어 하나를 어색하게 만들고 변형문제를 생성합니다.
           </p>
           <div className="vocabWordsRow">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -136,7 +143,7 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
             <textarea
               value={problem.writingAnswer}
               onChange={(e) => onPatch({ writingAnswer: e.target.value })}
-              placeholder="영작 문제의 기준이 되는 완성 영문을 입력하세요."
+              placeholder="영작 문제의 기준이 되는 완성 영문을 입력하세요. (예: It seems like we might make our funding goal!)"
             />
             <span className="charCount">{problem.writingAnswer.length.toLocaleString()}자</span>
           </div>
@@ -146,7 +153,7 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
       {showUnderlined && (
         <>
           <div className="sectionLabel" style={{ marginTop: 20 }}>
-            밑줄 표현 (예: an evolutionary principle)
+            지문에서 숨은 의미를 묻고 싶은 문장이나 표현을 그대로 복사해서 아래에 붙여넣으세요.
           </div>
           <input
             type="text"
@@ -162,13 +169,9 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
       {showGrammarPassageExprsFive && (
         <>
           <div className="sectionLabel" style={{ marginTop: 20 }}>
-            {grammarExprsOnly ? '객관식 어법 — 보기 5개' : '어법상 틀린 곳 찾기 — 지문상 표현 5개'}
+            {getGrammarPassageExprsFiveSectionLabel(typeId, customTypes)}
           </div>
-          <p className="grammarWrongNHint">
-            {grammarExprsOnly
-              ? `객관식 어법 문제의 보기로 사용할 표현 5개를 입력해 주세요.`
-              : `지문에 실제로 나오는 밑줄 후보 표현(단어·구) 5개를 적어 주세요.`}
-          </p>
+          <p className="grammarWrongNHint">{getGrammarPassageExprsFiveHint(typeId, customTypes)}</p>
           <div className={isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'}>
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="vocabWordCell">
@@ -201,11 +204,11 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
           </div>
           {showGrammarAnswerFormsFive && (
             <>
-              <div className="sectionLabel" style={{ marginTop: 14 }}>
+              {/* <div className="sectionLabel" style={{ marginTop: 14 }}>
                 객관식 어법 — 오답 5개
-              </div>
+              </div> */}
               <p className="grammarWrongNHint">
-                빈 칸은 보기 값으로 채우지 않습니다. 입력한 내용만 프롬프트의 {'{grammar_answer}'}에 전달됩니다.
+              위에서 입력한 다섯 개 문장에서 정답으로 만들고 싶은 문장의 일부를 '틀리게' 수정하여 같은 숫자 칸에 입력하세요. 오답을 입력하지 않는 보기는 맞는 보기로 처리됩니다.
               </p>
               <div className="vocabWordsRow">
                 {[0, 1, 2, 3, 4].map((i) => (
@@ -247,7 +250,7 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
           <div className="sectionLabel" style={{ marginTop: showGrammarPassageExprsFive ? 18 : 20 }}>
             어법상 틀린 곳 (객관식) — 기호·고쳐 쓰기
           </div>
-          <p className="grammarWrongNHint">지문에서 어법상 틀린 밑줄 개수입니다.</p>
+          <p className="grammarWrongNHint">지문에서 어법상 틀린 밑줄 개수를 고릅니다.</p>
           <div className="grammarWrongNChoice" role="group" aria-label="틀린 곳 개수">
             <span className="grammarWrongNChoiceLabel">틀린 곳 개수</span>
             <label className="grammarWrongNRadio">
@@ -306,7 +309,7 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
                         grammarWrongCorrections: problem.grammarWrongCorrections.map((x, j) => (j === i ? v : x)),
                       });
                     }}
-                    placeholder="고쳐 쓰기 할 밑줄 친 부분 전체를 입력하세요."
+                    placeholder="고쳐 쓰기 할 밑줄 친 부분 전체(완전한 문장/구)를 입력하세요."
                   />
                 </div>
               </div>
@@ -374,7 +377,7 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
               <textarea
                 value={problem.descriptiveAnswerText}
                 onChange={(e) => onPatch({ descriptiveAnswerText: e.target.value })}
-                placeholder="프롬프트에 들어갈 {answer} 값을 입력하세요."
+                placeholder="서술형 정답으로 쓸 내용을 입력하세요."
                 style={{ minHeight: 120 }}
               />
             </div>

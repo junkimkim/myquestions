@@ -83,7 +83,7 @@ export default function AuthNavUser() {
     );
   }
 
-  const short = user.email?.split('@')[0] ?? '계정';
+  const email = user.email ?? '';
   const bal = wallet?.balance;
 
   return (
@@ -97,8 +97,8 @@ export default function AuthNavUser() {
           <span className="authNavMuted">잔액 …</span>
         )}
       </Link>
-      <Link href="/mypage" className="appNavLink">
-        {short}
+      <Link href="/mypage" className="appNavLink" title={email || undefined}>
+        마이페이지
       </Link>
       <button type="button" className="authNavLogout" onClick={signOut}>
         로그아웃

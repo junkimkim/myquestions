@@ -58,6 +58,7 @@ export default function OneTypePage() {
   const [resultsByIndex, setResultsByIndex] = useState({});
   const [creditsModalOpen, setCreditsModalOpen] = useState(false);
   const [creditsModalMessage, setCreditsModalMessage] = useState('');
+  const [exampleModal, setExampleModal] = useState(null);
 
   const passageOnlyTypes = useMemo(
     () => customTypes.filter((c) => !typeNeedsExtraInput(c.id, customTypes, prompts)),
@@ -92,6 +93,44 @@ export default function OneTypePage() {
     setShowResults(false);
   }, []);
 
+  const openExampleModal = useCallback(async (c) => {
+    const title = c?.name || '유형';
+    const typeId = c?.id;
+    if (!typeId) return;
+    setExampleModal({ open: true, typeId, title, status: 'loading' });
+    try {
+      const res = await fetch(`/api/custom-type-example?typeId=${encodeURIComponent(typeId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId
+            ? { ...prev, status: 'error', err: data.error || `조회 실패 (${res.status})` }
+            : prev,
+        );
+        return;
+      }
+      if (data.found && data.url) {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId
+            ? { ...prev, status: 'ok', url: `${data.url}?v=${Date.now()}` }
+            : prev,
+        );
+      } else {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId ? { ...prev, status: 'empty' } : prev,
+        );
+      }
+    } catch (e) {
+      setExampleModal((prev) =>
+        prev && prev.typeId === typeId
+          ? { ...prev, status: 'error', err: e instanceof Error ? e.message : '오류' }
+          : prev,
+      );
+    }
+  }, []);
+
+  const closeExampleModal = useCallback(() => setExampleModal(null), []);
+
   const generateBatch = useCallback(async () => {
     if (!selectedTypeId) {
       setValidationError('문제 유형을 하나 선택해 주세요.');
@@ -105,7 +144,7 @@ export default function OneTypePage() {
     const kind = getTypeKind(typeRow);
 
     if (!promptTemplate || !String(promptTemplate).includes('{passage}')) {
-      setValidationError('선택한 유형의 프롬프트에 {passage}가 필요합니다. 유형 관리에서 확인하세요.');
+      setValidationError('선택한 유형의 프롬프트에 지문이 들어갈 자리가 없습니다. 유형 설정을 확인하세요.');
       setShowResults(true);
       return;
     }
@@ -203,7 +242,7 @@ export default function OneTypePage() {
           <span className="logo">QuizForge</span>
           <span className="logoBadge">한 유형 일괄</span>
         </div>
-        <p className="subtitle">여러 지문에 같은 유형의 변형문제를 순서대로 만듭니다. (지문만으로 생성 가능한 유형만)</p>
+        <p className="subtitle">여러 지문을 한 유형의 변형문제로 생성합니다. (지문만으로 생성 가능한 유형만)</p>
       </header>
       <QuizForgeNav />
       {!ready ? (
@@ -217,19 +256,15 @@ export default function OneTypePage() {
           )}
 
           <p className="persistMsg" style={{ marginBottom: 16 }}>
-            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
-            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다.{' '}
           </p>
 
           <div className="mainWorkRow">
             <div className="mainWorkColLeft">
               <div className="inlineTypeConfig globalPassageConfig">
-                <div className="sectionLabel">영어 지문 (여러 개)</div>
+                <div className="sectionLabel">영어 지문 ('지문 추가'를 클릭하여 지문을 추가할 수 있습니다.)</div>
                 <p className="globalPassageHint oneTypeHint">
-                  문제 생성 화면에서 &quot;지문만 입력하면 되는 유형&quot;과 동일한 조건입니다. 영작·어휘·서술·어법 보조 입력이 필요한 유형은 오른쪽 목록에 나오지 않습니다.{' '}
-                  <Link href="/types" className="typesEmptyLink">
-                    유형 관리
-                  </Link>
+                  영작·어휘·서술·어법 추가 입력이 필요한 유형은 오른쪽 목록에 나오지 않습니다.
                 </p>
 
                 {passages.map((p, i) => (
@@ -276,9 +311,9 @@ export default function OneTypePage() {
                     </div>
                   </div>
                 </div>
-                <p className="globalPassageHint" style={{ marginTop: 8 }}>
-                  GPT 모델은 <strong>유형 관리</strong>(<code>/types</code>)에서 선택합니다.
-                </p>
+                {/* <p className="globalPassageHint" style={{ marginTop: 8 }}>
+                  GPT 모델은 로그인 시 프로필에 저장된 설정을 사용합니다.
+                </p> */}
               </div>
             </div>
 
@@ -290,10 +325,7 @@ export default function OneTypePage() {
                 <div className="typesEmptyCard">
                   <p className="typesEmptyTitle">지문만으로 생성할 수 있는 등록 유형이 없습니다.</p>
                   <p className="typesEmptyText">
-                    <Link href="/types" className="typesEmptyLink">
-                      유형 관리
-                    </Link>
-                    에서 객관식 유형을 추가하거나, 영작·어휘·서술이 아닌 유형을 사용해 주세요.
+                    객관식 유형이 등록되어 있어야 하며, 영작·어휘·서술이 아닌 유형만 이 목록에 표시됩니다. 유형이 없으면 관리자에게 문의하세요.
                   </p>
                 </div>
               ) : (
@@ -319,6 +351,18 @@ export default function OneTypePage() {
                           <div className="oneTypeRadioName">{inf.name}</div>
                           <div className="oneTypeRadioDesc">{inf.desc || '—'}</div>
                         </div>
+                        <button
+                          type="button"
+                          className="examplePreviewBtn oneTypeExampleBtn"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openExampleModal(c);
+                          }}
+                        >
+                          예시 보기
+                        </button>
                       </label>
                     );
                   })}
@@ -415,9 +459,66 @@ export default function OneTypePage() {
             </div>
           )}
 
-          <p className="dragHint" style={{ marginTop: 24 }}>
+          {/* <p className="dragHint" style={{ marginTop: 24 }}>
             <Link href="/">← 문제 생성(메인)</Link>
-          </p>
+          </p> */}
+
+          <div
+            className={`modalOverlay modalZExample ${exampleModal?.open ? 'modalOverlayOpen' : ''}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeExampleModal();
+            }}
+            role="presentation"
+          >
+            {exampleModal?.open && (
+              <div
+                className="modal modalExample"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="onetype-example-modal-title"
+              >
+                <h3 id="onetype-example-modal-title">{exampleModal.title} — 예시 문제</h3>
+                <p className="modalIntro">
+                  이 유형에 등록된 예시 이미지입니다. 파일 경로:{' '}
+                  <code>public/custom-type-examples/</code>
+                </p>
+                {exampleModal.status === 'loading' && (
+                  <div className="exampleModalBody exampleModalLoading">
+                    <span className="spinner" style={{ borderTopColor: 'var(--accent)' }} />
+                    불러오는 중…
+                  </div>
+                )}
+                {exampleModal.status === 'empty' && (
+                  <div className="exampleModalBody">
+                    <p className="exampleEmptyText">예시 이미지가 없습니다.</p>
+                    <p className="formHint">
+                      해당 유형에 예시 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
+                    </p>
+                  </div>
+                )}
+                {exampleModal.status === 'ok' && exampleModal.url && (
+                  <div className="exampleModalBody">
+                    <div className="exampleImageWrap">
+                      <img src={exampleModal.url} alt={`${exampleModal.title} 예시`} className="exampleImage" />
+                    </div>
+                  </div>
+                )}
+                {exampleModal.status === 'error' && (
+                  <div className="exampleModalBody">
+                    <p className="exampleEmptyText" style={{ color: 'var(--danger)' }}>
+                      {exampleModal.err || '오류가 발생했습니다.'}
+                    </p>
+                  </div>
+                )}
+                <div className="modalFooter">
+                  <button type="button" className="btnSm btnPrimary" onClick={closeExampleModal}>
+                    닫기
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
       <InsufficientCreditsModal

@@ -16,6 +16,7 @@ import {
   buildUserPrompt,
 } from '@/lib/paraphrasePrompt';
 import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
+import ProblemSupplementFields from '@/components/ProblemSupplementFields';
 import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerateClient';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 import { toErrorMessage } from '@/lib/toErrorMessage';
@@ -28,14 +29,12 @@ import {
   isAwkwardWordMcqType,
   promptHasAnswerCount,
   isGrammarWrongFinderType,
-  isGrammarExprsOnlyType,
   isSentenceGrammarMcqType,
   grammarNeedsPassageExprsFive,
   grammarNeedsAnswerFormsFive,
   grammarNeedsFullSupplementBlocks,
   isResetOnEnterAnswerCountType,
   getTypeGroup,
-  promptRequiresUnderlined,
   promptRequiresVoca,
   typeNeedsExtraInput as computeTypeNeedsExtraInput,
 } from '@/lib/typeExtraInput';
@@ -149,6 +148,58 @@ export default function Home() {
     setGrammarWrongCount((c) => clampGrammarWrongSpotCount(c));
   }, []);
 
+  const mainSupplementProblem = useMemo(
+    () => ({
+      vocabWords,
+      awkwardVocaWords,
+      grammarPassageExprs,
+      grammarAnswerForms,
+      writingAnswer,
+      underlinedStentence,
+      grammarWrongCount,
+      grammarWrongLetters,
+      grammarWrongCorrections,
+      descriptiveAnswerText,
+      descriptiveAnswerCount,
+      descriptiveAnswerEntries,
+      specialDescriptiveAnswerCount,
+      specialDescriptiveAnswerEntries,
+    }),
+    [
+      vocabWords,
+      awkwardVocaWords,
+      grammarPassageExprs,
+      grammarAnswerForms,
+      writingAnswer,
+      underlinedStentence,
+      grammarWrongCount,
+      grammarWrongLetters,
+      grammarWrongCorrections,
+      descriptiveAnswerText,
+      descriptiveAnswerCount,
+      descriptiveAnswerEntries,
+      specialDescriptiveAnswerCount,
+      specialDescriptiveAnswerEntries,
+    ],
+  );
+
+  const patchMainSupplement = useCallback((patch) => {
+    if (patch.vocabWords !== undefined) setVocabWords(patch.vocabWords);
+    if (patch.awkwardVocaWords !== undefined) setAwkwardVocaWords(patch.awkwardVocaWords);
+    if (patch.grammarPassageExprs !== undefined) setGrammarPassageExprs(patch.grammarPassageExprs);
+    if (patch.grammarAnswerForms !== undefined) setGrammarAnswerForms(patch.grammarAnswerForms);
+    if (patch.writingAnswer !== undefined) setWritingAnswer(patch.writingAnswer);
+    if (patch.underlinedStentence !== undefined) setUnderlinedStentence(patch.underlinedStentence);
+    if (patch.grammarWrongCount !== undefined) setGrammarWrongCount(patch.grammarWrongCount);
+    if (patch.grammarWrongLetters !== undefined) setGrammarWrongLetters(patch.grammarWrongLetters);
+    if (patch.grammarWrongCorrections !== undefined) setGrammarWrongCorrections(patch.grammarWrongCorrections);
+    if (patch.descriptiveAnswerText !== undefined) setDescriptiveAnswerText(patch.descriptiveAnswerText);
+    if (patch.descriptiveAnswerCount !== undefined) setDescriptiveAnswerCount(patch.descriptiveAnswerCount);
+    if (patch.descriptiveAnswerEntries !== undefined) setDescriptiveAnswerEntries(patch.descriptiveAnswerEntries);
+    if (patch.specialDescriptiveAnswerCount !== undefined) setSpecialDescriptiveAnswerCount(patch.specialDescriptiveAnswerCount);
+    if (patch.specialDescriptiveAnswerEntries !== undefined) setSpecialDescriptiveAnswerEntries(patch.specialDescriptiveAnswerEntries);
+  }, []);
+
   const typeIds = useMemo(() => customTypes.map((c) => c.id), [customTypes]);
 
   const activeCount = useMemo(
@@ -163,38 +214,6 @@ export default function Home() {
   const deselectAllTypes = useCallback(() => {
     setActiveTypes([]);
     setSupplementFocusTypeId(null);
-  }, []);
-
-  const setVocabAt = useCallback((index, value) => {
-    setVocabWords((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
-  }, []);
-
-  const setAwkwardVocaAt = useCallback((index, value) => {
-    setAwkwardVocaWords((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
-  }, []);
-
-  const setGrammarPassageExprAt = useCallback((index, value) => {
-    setGrammarPassageExprs((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
-  }, []);
-
-  const setGrammarAnswerFormAt = useCallback((index, value) => {
-    setGrammarAnswerForms((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
   }, []);
 
   const handleColumnDragOver = useCallback((e, kind) => {
@@ -379,7 +398,7 @@ export default function Home() {
     const anyActiveNeedsVoca = customActive.some((id) => String(prompts[id] ?? '').includes('{voca}'));
     if (anyActiveNeedsVoca && awkwardVocaTrim.some((w) => !w)) {
       showError(
-        '프롬프트에 {voca}가 포함된 유형이 선택되어 있습니다. 해당 유형 카드를 눌러 지문상 어휘 5개를 모두 입력해 주세요.',
+        '지문상 어휘 입력이 필요한 유형이 선택되어 있습니다. 해당 유형 카드를 눌러 지문상 어휘 5개를 모두 입력해 주세요.',
       );
       return;
     }
@@ -440,7 +459,7 @@ export default function Home() {
             .slice(0, n)
             .map((v) => String(v ?? '').trim());
           if (entries.some((x) => !x)) {
-            showError('서술형( {answer_count} ) 유형: 정답 항목을 1개씩 모두 입력해 주세요.');
+            showError('서술형(여러 정답 칸) 유형: 정답 항목을 1개씩 모두 입력해 주세요.');
             return;
           }
         }
@@ -475,7 +494,7 @@ export default function Home() {
       return !promptHasAnswerCount(prompts, id);
     });
     if (otherDescriptiveNeedingSingleAnswer && !descriptiveAnswerText.trim()) {
-      showError('서술형 유형이 선택되어 있습니다. 프롬프트의 {answer} 값을 입력해 주세요.');
+      showError('서술형 유형이 선택되어 있습니다. 정답 입력란을 채워 주세요.');
       return;
     }
 
@@ -505,7 +524,7 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '프롬프트에 {passage} 플레이스홀더가 필요합니다. 프롬프트 설정을 확인하세요.',
+            error: '이 유형의 프롬프트에 지문이 들어갈 자리가 없습니다. 유형 설정에서 프롬프트를 확인하세요.',
           },
         }));
         continue;
@@ -517,7 +536,7 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '영작 유형 프롬프트에 {answer} 플레이스홀더가 필요합니다. 유형 관리 또는 프롬프트 설정을 확인하세요.',
+            error: '영작 유형 프롬프트에 정답 문장이 들어갈 자리가 없습니다. 유형 설정을 확인하세요.',
           },
         }));
         continue;
@@ -529,7 +548,7 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '어휘 유형 프롬프트에 {vocab} 플레이스홀더가 필요합니다. 유형 관리 또는 프롬프트 설정을 확인하세요.',
+            error: '어휘 유형 프롬프트에 어휘 목록이 들어갈 자리가 없습니다. 유형 설정을 확인하세요.',
           },
         }));
         continue;
@@ -556,7 +575,7 @@ export default function Home() {
               status: 'error',
               label,
               tagClass,
-              error: '서술형 유형은 프롬프트에 {answer} 플레이스홀더가 필요합니다.',
+              error: '서술형 유형 프롬프트에 정답이 들어갈 자리가 없습니다. 유형 설정을 확인하세요.',
             },
           }));
           continue;
@@ -568,7 +587,7 @@ export default function Home() {
               status: 'error',
               label,
               tagClass,
-              error: '서술형 유형의 정답 {answer} 값을 입력해 주세요.',
+              error: '서술형 유형의 정답 입력란을 채워 주세요.',
             },
           }));
           continue;
@@ -584,7 +603,7 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '프롬프트에 {underlined_sentence} 플레이스홀더가 필요합니다. 밑줄 표현을 입력하세요.',
+            error: '밑줄로 묻고 싶은 표현을 입력해 주세요.',
           },
         }));
         continue;
@@ -598,7 +617,7 @@ export default function Home() {
             status: 'error',
             label,
             tagClass,
-            error: '프롬프트에 {voca}가 있습니다. 지문상 어휘 5개를 모두 입력해 주세요.',
+            error: '지문상 어휘 5개를 모두 입력해 주세요.',
           },
         }));
         continue;
@@ -894,7 +913,7 @@ export default function Home() {
           className="typeDragHandle"
           draggable
           aria-label="드래그하여 이 목록 구역에 놓으면 객관식으로 저장됩니다"
-          title="이 구역에 놓으면 객관식으로 바뀝니다. 서술형·영작·어휘는 유형 관리에서 설정하세요."
+          title="이 구역에 놓으면 객관식으로 바뀝니다. 서술형·영작·어휘는 등록된 유형에 맞게 설정되어 있어야 합니다."
           onClick={(e) => e.preventDefault()}
           onDragStart={(e) => {
             e.dataTransfer.setData('text/plain', c.id);
@@ -956,7 +975,7 @@ export default function Home() {
       <div className="inlineTypeConfig globalPassageConfig">
         <div className="sectionLabel">영어 지문 입력</div>
         <p className="globalPassageHint">
-          한 지문으로 선택한 모든 유형의 문제를 만듭니다. 추가 입력(영작·어휘 등)은 오른쪽 패널에서 해당 유형 카드를 클릭해 채웁니다.
+          한 지문으로 선택한 모든 유형의 문제를 만듭니다.
         </p>
         <div className="passageWrap">
           <textarea
@@ -978,382 +997,13 @@ export default function Home() {
               <label htmlFor="paraphrase-check-main" className="paraphraseLabel">
                 <span className="paraphraseTitle">Paraphraze</span>
                 <span className="paraphraseHint">
-                  켜면 먼저 지문을 paraphrase한 뒤, 그 결과만을 근거로 선택한 유형의 변형 문제 프롬프트가 동작합니다. (1단계 지문 Paraphrase → 2단계 문제 생성)
+                  켜면 먼저 지문을 paraphrase한 뒤, 동일한 내용의 새로운 지문으로 선택한 유형의 변형 문제를 생성합니다. (1단계 지문 Paraphrase → 2단계 문제 생성)
                 </span>
               </label>
             </div>
           </div>
         </div>
-        <p className="globalPassageHint" style={{ marginTop: -20, marginBottom: 24 }}>
-          사용할 GPT 모델은 <strong>유형 관리</strong>(주소 <code>/types</code>)에서 선택합니다. 기본은 <code>gpt-5.4-mini</code>입니다.
-        </p>
-      </div>
-    );
-  }
 
-  function renderSupplementsForFocusedType(typeId) {
-    const c = customTypes.find((x) => x.id === typeId);
-    if (!c) return null;
-    const kind = getTypeKind(c);
-    const showVocab = kind === 'vocabulary';
-    const showWriting = kind === 'writing';
-    const showUnderlined = promptRequiresUnderlined(typeId, customTypes, prompts);
-    const grammarWrongFinder = isGrammarWrongFinderType(typeId, customTypes, prompts);
-    const grammarExprsOnly = isGrammarExprsOnlyType(typeId, customTypes);
-    const isSentenceGrammarMcq = isSentenceGrammarMcqType(typeId);
-    /** {answer_count} 프롬프트면 서술형 다줄 UI, 아니면 기호·틀린 개수 UI */
-    const showGrammarWrongSymbolMode =
-      grammarWrongFinder && !promptHasAnswerCount(prompts, typeId) && !grammarExprsOnly;
-    /** 지문 표현 5칸 — 특정 ID는 전용, 특정 ID는 제외 */
-    const showGrammarPassageExprsFive = grammarNeedsPassageExprsFive(typeId, customTypes, prompts);
-    const showGrammarAnswerFormsFive = grammarNeedsAnswerFormsFive(typeId, customTypes);
-    const showDescriptiveCount =
-      promptHasAnswerCount(prompts, typeId) &&
-      (Boolean(c.is_descriptive) || grammarWrongFinder) &&
-      !grammarExprsOnly;
-    const showDescriptiveSingle =
-      Boolean(c.is_descriptive) &&
-      !grammarWrongFinder &&
-      !promptHasAnswerCount(prompts, typeId);
-    const activeAnswerCount = isResetOnEnterAnswerCountType(typeId)
-      ? specialDescriptiveAnswerCount
-      : descriptiveAnswerCount;
-    const activeAnswerEntries = isResetOnEnterAnswerCountType(typeId)
-      ? specialDescriptiveAnswerEntries
-      : descriptiveAnswerEntries;
-    const setActiveAnswerCount = isResetOnEnterAnswerCountType(typeId)
-      ? setSpecialDescriptiveAnswerCount
-      : setDescriptiveAnswerCount;
-    const setActiveAnswerEntries = isResetOnEnterAnswerCountType(typeId)
-      ? setSpecialDescriptiveAnswerEntries
-      : setDescriptiveAnswerEntries;
-    const showAwkwardPassageVoca =
-      kind === 'mcq' && (isAwkwardWordMcqType(c) || promptRequiresVoca(typeId, customTypes, prompts));
-
-    return (
-      <div className="inlineTypeConfig typeSupplementCard">
-        {showVocab && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: 4 }}>
-              출제 어휘 5개
-            </div>
-            <p className="vocabSectionHint">
-              지문과 함께 쓰면 지문에서 해당 표현을 찾아 맥락 문제로 출제합니다. 단어 5칸만 채우면 지문 없이 &quot;단어:영영풀이&quot; 형식의 5지선다 문제로 출제합니다.
-            </p>
-            <div className={isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'}>
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="vocabWordCell">
-                  <label className="vocabWordLabel" htmlFor={`vocab-global-${i}`}>
-                    {i + 1}
-                  </label>
-                  <input
-                    id={`vocab-global-${i}`}
-                    type="text"
-                    className="vocabWordInput"
-                    value={vocabWords[i]}
-                    onChange={(e) => setVocabAt(i, e.target.value)}
-                    placeholder={`단어 ${i + 1}`}
-                    autoComplete="off"
-                  />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {showAwkwardPassageVoca && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: showVocab ? 20 : 4 }}>
-              지문상 어휘 5개 (문맥상 어색한 낱말)
-            </div>
-            <p className="vocabSectionHint">
-              지문에 실제로 나오는 단어·구를 5개 적어 주세요. 프롬프트의 {'{voca}'}에 번호 목록으로 들어가며, 어휘 전용 유형의 {'{vocab}'}과는 별도입니다.
-            </p>
-            <div className="vocabWordsRow">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="vocabWordCell">
-                  <label className="vocabWordLabel" htmlFor={`awkward-voca-${typeId}-${i}`}>
-                    {i + 1}
-                  </label>
-                  <input
-                    id={`awkward-voca-${typeId}-${i}`}
-                    type="text"
-                    className="vocabWordInput"
-                    value={awkwardVocaWords[i]}
-                    onChange={(e) => setAwkwardVocaAt(i, e.target.value)}
-                    placeholder={`지문 어휘 ${i + 1}`}
-                    autoComplete="off"
-                  />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {showWriting && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: showVocab || showAwkwardPassageVoca ? 20 : 4 }}>
-              영작 정답 문장
-            </div>
-            <div className="passageWrap">
-              <textarea
-                value={writingAnswer}
-                onChange={(e) => setWritingAnswer(e.target.value)}
-                placeholder="영작 문제의 기준이 되는 완성 영문을 입력하세요. (예: It seems like we might make our funding goal!)"
-              />
-              <span className="charCount">{writingAnswer.length.toLocaleString()}자</span>
-            </div>
-          </>
-        )}
-
-        {showUnderlined && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: 20 }}>
-              밑줄 표현 (예: an evolutionary principle)
-            </div>
-            <input
-              type="text"
-              className="vocabWordInput"
-              value={underlinedStentence}
-              onChange={(e) => setUnderlinedStentence(e.target.value)}
-              placeholder="밑줄 친 표현(원문 그대로)을 입력하세요."
-              autoComplete="off"
-            />
-          </>
-        )}
-
-        {showGrammarPassageExprsFive && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: 20 }}>
-              {grammarExprsOnly ? '객관식 어법 — 보기 5개' : '어법상 틀린 곳 찾기 — 지문상 표현 5개'}
-            </div>
-            <p className="grammarWrongNHint">
-              {grammarExprsOnly
-                ? `객관식 어법 문제의 보기로 사용할 표현 5개를 입력해 주세요. 프롬프트의 ${'{grammar_exprs}'}에 번호 목록으로 들어갑니다.`
-                : `지문에 실제로 나오는 밑줄 후보 표현(단어·구) 5개를 적어 주세요. 프롬프트에 ${'{grammar_exprs}'}가 있으면 번호 목록으로 치환됩니다.`}
-            </p>
-            <div
-              className={
-                isSentenceGrammarMcq ? 'vocabWordsRow vocabWordsRowStack' : 'vocabWordsRow'
-              }
-            >
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="vocabWordCell">
-                  <label className="vocabWordLabel" htmlFor={`grammar-expr-${typeId}-${i}`}>
-                    {i + 1}
-                  </label>
-                  {isSentenceGrammarMcq ? (
-                    <textarea
-                      id={`grammar-expr-${typeId}-${i}`}
-                      className="vocabWordInput grammarCompactTextarea"
-                      rows={1}
-                      style={{ resize: 'vertical' }}
-                      value={grammarPassageExprs[i]}
-                      onChange={(e) => setGrammarPassageExprAt(i, e.target.value)}
-                      placeholder={`보기 문장 ${i + 1}`}
-                    />
-                  ) : (
-                    <input
-                      id={`grammar-expr-${typeId}-${i}`}
-                      type="text"
-                      className="vocabWordInput"
-                      value={grammarPassageExprs[i]}
-                      onChange={(e) => setGrammarPassageExprAt(i, e.target.value)}
-                      placeholder={grammarExprsOnly ? `보기 ${i + 1}` : `지문 표현 ${i + 1}`}
-                      autoComplete="off"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            {showGrammarAnswerFormsFive && (
-              <>
-                <div className="sectionLabel" style={{ marginTop: 14 }}>
-                  객관식 어법 — 오답 5개
-                </div>
-                <p className="grammarWrongNHint">
-                  빈 칸은 보기 값으로 채우지 않습니다. 입력한 내용만 프롬프트의 {'{grammar_answer}'}에 전달됩니다. (일부 유형은 입력 개수가 {'{answer_count}'}에 반영됩니다.)
-                </p>
-                <div className="vocabWordsRow">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div key={i} className="vocabWordCell">
-                      <label className="vocabWordLabel" htmlFor={`grammar-answer-${typeId}-${i}`}>
-                        {i + 1}
-                      </label>
-                      {isSentenceGrammarMcq ? (
-                        <textarea
-                          id={`grammar-answer-${typeId}-${i}`}
-                          className="vocabWordInput grammarCompactTextarea"
-                          rows={3}
-                          style={{ resize: 'vertical' }}
-                          value={grammarAnswerForms[i]}
-                          onChange={(e) => setGrammarAnswerFormAt(i, e.target.value)}
-                          placeholder={`틀리게 고칠 부분 ${i + 1}`}
-                        />
-                      ) : (
-                        <input
-                          id={`grammar-answer-${typeId}-${i}`}
-                          type="text"
-                          className="vocabWordInput"
-                          value={grammarAnswerForms[i]}
-                          onChange={(e) => setGrammarAnswerFormAt(i, e.target.value)}
-                          placeholder={`오답 ${i + 1}`}
-                          autoComplete="off"
-                        />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
-
-        {showGrammarWrongSymbolMode && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: showGrammarPassageExprsFive ? 18 : 20 }}>
-              어법상 틀린 곳 (객관식) — 기호·고쳐 쓰기
-            </div>
-            <p className="grammarWrongNHint">지문에서 어법상 틀린 밑줄 개수입니다. 프롬프트의 {'{n}'}·{'{answer_count}'}에 들어갑니다.</p>
-            <div className="grammarWrongNChoice" role="group" aria-label="틀린 곳 개수">
-              <span className="grammarWrongNChoiceLabel">틀린 곳 개수</span>
-              <label className="grammarWrongNRadio">
-                <input
-                  type="radio"
-                  name={`grammar-wrong-spot-count-${typeId}`}
-                  checked={clampGrammarWrongSpotCount(grammarWrongCount) === 1}
-                  onChange={() => setGrammarWrongCount(1)}
-                />
-                1개
-              </label>
-              <label className="grammarWrongNRadio">
-                <input
-                  type="radio"
-                  name={`grammar-wrong-spot-count-${typeId}`}
-                  checked={clampGrammarWrongSpotCount(grammarWrongCount) === 2}
-                  onChange={() => setGrammarWrongCount(2)}
-                />
-                2개
-              </label>
-            </div>
-            <div className="sectionLabel" style={{ marginTop: 16 }}>
-              정답 기호·고쳐 쓰기 ({clampGrammarWrongSpotCount(grammarWrongCount)}개)
-            </div>
-            <div className="grammarWrongFinderInputs">
-              {[0, 1].slice(0, clampGrammarWrongSpotCount(grammarWrongCount)).map((_, i) => (
-                <div key={i} className="grammarWrongFinderRow">
-                  <div className="grammarWrongFinderHead">
-                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>기호 {i + 1}</span>
-                  </div>
-                  <div className="grammarWrongFinderControls">
-                    <select
-                      value={String(grammarWrongLetters[i] ?? '').trim().toUpperCase()}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setGrammarWrongLetters((prev) => {
-                          const next = [...prev];
-                          next[i] = v;
-                          return next;
-                        });
-                      }}
-                      className="modelSelect"
-                      style={{ width: 130 }}
-                    >
-                      {['A', 'B', 'C', 'D', 'E'].map((ch) => (
-                        <option key={ch} value={ch}>
-                          {ch}
-                        </option>
-                      ))}
-                    </select>
-                    <textarea
-                      className="vocabWordInput"
-                      style={{ flex: 1, minHeight: 78, resize: 'vertical' }}
-                      value={grammarWrongCorrections[i] ?? ''}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setGrammarWrongCorrections((prev) => {
-                          const next = [...prev];
-                          next[i] = v;
-                          return next;
-                        });
-                      }}
-                      placeholder="고쳐 쓰기 할 밑줄 친 부분 전체(완전한 문장/구)를 입력하세요."
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-
-        {(showDescriptiveCount || showDescriptiveSingle) && (
-          <>
-            <div className="sectionLabel" style={{ marginTop: 20 }}>
-              서술형 정답 입력
-            </div>
-            {showDescriptiveCount ? (
-              <>
-                <div className="countAdjustRow">
-                  <button
-                    type="button"
-                    className="btnSm btnGhost"
-                    onClick={() => {
-                      setActiveAnswerCount((n) => Math.max(1, n - 1));
-                    }}
-                    disabled={activeAnswerCount <= 1}
-                  >
-                    - 삭제
-                  </button>
-                  <span className="countAdjustRowMeta">현재 {activeAnswerCount}개</span>
-                  <button
-                    type="button"
-                    className="btnSm btnGhost"
-                    onClick={() => {
-                      setActiveAnswerCount((n) => Math.min(4, n + 1));
-                    }}
-                    disabled={activeAnswerCount >= 4}
-                  >
-                    + 추가
-                  </button>
-                </div>
-                <div className="grammarWrongFinderInputs">
-                  {[0, 1, 2, 3].slice(0, activeAnswerCount).map((_, i) => (
-                    <div key={i} className="grammarWrongFinderRow">
-                      <div className="grammarWrongFinderHead">
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)' }}>정답 항목 {i + 1}</span>
-                      </div>
-                      <div className="grammarWrongFinderControls">
-                        <textarea
-                          className="vocabWordInput"
-                          style={{ flex: 1, minHeight: 78, resize: 'vertical' }}
-                          value={activeAnswerEntries[i] ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setActiveAnswerEntries((prev) => {
-                              const next = [...prev];
-                              next[i] = v;
-                              return next;
-                            });
-                          }}
-                          placeholder="- 정답이 되는 온전한 문장 전체를 입력하세요."
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="passageWrap">
-                <textarea
-                  value={descriptiveAnswerText}
-                  onChange={(e) => setDescriptiveAnswerText(e.target.value)}
-                  placeholder="프롬프트에 들어갈 {answer} 값을 입력하세요."
-                  style={{ minHeight: 120 }}
-                />
-              </div>
-            )}
-          </>
-        )}
       </div>
     );
   }
@@ -1405,8 +1055,7 @@ export default function Home() {
             </p>
           )}
           <p className="persistMsg" style={{ marginBottom: 16 }}>
-            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
-            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다.{' '}
           </p>
 
           <div className="mainWorkRow">
@@ -1421,12 +1070,19 @@ export default function Home() {
                       추가 입력이 필요한 유형을 여러 개 선택하면 아래에 순서대로 쌓입니다. 각 블록을 모두 채운 뒤 생성하세요.
                     </p>
                     <div className="typeSupplementStackWrap">
-                      {activeExtraTypeIds.map((typeId) => (
+                      {activeExtraTypeIds.map((typeId, stackIndex) => (
                         <div key={typeId} className="typeSupplementStackItem">
                           <div className="supplementStackHead">
                             <span className="supplementStackName">{getTypeInfo(typeId, customTypes).name}</span>
                           </div>
-                          {renderSupplementsForFocusedType(typeId)}
+                          <ProblemSupplementFields
+                            problemIndex={stackIndex}
+                            typeId={typeId}
+                            customTypes={customTypes}
+                            prompts={prompts}
+                            problem={mainSupplementProblem}
+                            onPatch={patchMainSupplement}
+                          />
                         </div>
                       ))}
                     </div>
@@ -1453,16 +1109,12 @@ export default function Home() {
                   전체 해제
                 </button>
               </div>
-              <p className="dragHint">
-                왼쪽에서 지문·모델을 설정합니다. 상단은 지문만으로 생성 가능한 유형, 하단은 추가 입력이 필요한 유형입니다. ≡ 드래그로 이 목록 구역에 놓으면 객관식으로 바뀝니다(서술형·영작·어휘는 유형 관리에서 설정).
-              </p>
+
 
               {customTypes.length === 0 && (
                 <div className="typesEmptyCard">
                   <p className="typesEmptyTitle">등록된 맞춤 문제 유형이 없습니다.</p>
-                  <p className="typesEmptyText">
-                    유형 관리 페이지에서 객관식·서술형·영작·어휘 유형을 추가할 수 있습니다. (주소창에 <code>/types</code> 입력)
-                  </p>
+                  <p className="typesEmptyText">유형 추가가 필요하면 관리자에게 문의하세요.</p>
                 </div>
               )}
 
@@ -1470,12 +1122,12 @@ export default function Home() {
                 <>
                   {renderTypeBucket({
                     title: '지문만 입력하면 되는 유형',
-                    hint: '지문·모델만으로 생성합니다. 서술형·영작·어휘는 추가 입력이 필요해 하단에만 나타납니다.',
+                    hint: '지문만으로 변형문제를 생성합니다. 예시 보기 버튼을 클릭하면 샘플 문제를 확인할 수 있습니다. 서술형·영작·어휘 등 추가 입력이 필요한 유형은 하단에 있습니다.',
                     typeList: typesPassageOnlyBucket,
                   })}
                   {renderTypeBucket({
                     title: '지문 + 추가 입력이 필요한 유형',
-                    hint: '왼쪽 패널에서 단어·정답·어법 표현 등을 채운 뒤 생성하세요. 객관식·서술형·영작·어휘가 함께 표시됩니다.',
+                    hint: '지문을 기반으로, 단어·정답·어법 표현 등을 추가 입력 창에 채운 뒤 생성하세요.',
                     typeList: typesNeedingExtraBucket,
                   })}
                 </>
@@ -1593,7 +1245,7 @@ export default function Home() {
               >
                 <h3 id="example-modal-title">{exampleModal.title} — 예시 문제</h3>
                 <p className="modalIntro">
-                  유형 관리에서 등록한 예시 이미지입니다. 파일 경로:{' '}
+                  이 유형에 등록된 예시 이미지입니다. 파일 경로:{' '}
                   <code>public/custom-type-examples/</code>
                 </p>
                 {exampleModal.status === 'loading' && (
@@ -1606,7 +1258,7 @@ export default function Home() {
                   <div className="exampleModalBody">
                     <p className="exampleEmptyText">예시 이미지가 없습니다.</p>
                     <p className="formHint">
-                      유형 관리(/types)에서 해당 유형에 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
+                      해당 유형에 예시 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
                     </p>
                   </div>
                 )}
@@ -1634,6 +1286,13 @@ export default function Home() {
           </div>
         </>
       )}
+      <footer className="siteBusinessFooter">
+        <p>상호명: 제이케이에듀케이션</p>
+        <p>사업자등록번호: 605-54-01113</p>
+        <p>대표자명: 김준기</p>
+        <p>사업장 주소: 경기도 부천시 소사구 성무로17번길 55-6, 1층</p>
+        <p>유선번호: 010-6893-2048</p>
+      </footer>
       <InsufficientCreditsModal
         open={creditsModalOpen}
         onClose={() => setCreditsModalOpen(false)}

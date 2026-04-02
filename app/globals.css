@@ -52,6 +52,20 @@ body::before {
   z-index: 1;
 }
 
+.siteBusinessFooter {
+  margin-top: 48px;
+  padding-top: 24px;
+  padding-bottom: 32px;
+  border-top: 1px solid var(--border);
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: var(--text2);
+}
+
+.siteBusinessFooter p {
+  margin: 0.2em 0;
+}
+
 /* 메인: 지문·추가입력(6) | 유형 선택(4) */
 .mainWorkRow {
   display: flex;
@@ -2278,6 +2292,12 @@ body {
   line-height: 1.45;
 }
 
+.oneTypeRadioItem .oneTypeExampleBtn {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
 .oneTypeResultPassageIdx {
   font-size: 0.78rem;
   color: var(--text2);
@@ -2334,8 +2354,27 @@ details[open] > .expectedAccordionSummary::before {
   min-width: 0;
 }
 
-.expectedAccordionRemove {
+.expectedAccordionSummaryEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+.expectedAccordionChevron {
+  display: block;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 7px solid var(--text2);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+details[open] > .expectedAccordionSummary .expectedAccordionChevron {
+  transform: rotate(180deg);
 }
 
 .expectedAccordionParaphrase.paraphraseModelRow {

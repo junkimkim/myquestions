@@ -51,7 +51,7 @@ function IconAlert(props) {
   );
 }
 
-function TypeRadioBuckets({ problemIndex, customTypes, prompts, selectedTypeId, onSelectTypeId }) {
+function TypeRadioBuckets({ problemIndex, customTypes, prompts, selectedTypeId, onSelectTypeId, onOpenExample }) {
   const passageOnly = useMemo(
     () => customTypes.filter((c) => !typeNeedsExtraInput(c.id, customTypes, prompts)),
     [customTypes, prompts],
@@ -78,6 +78,18 @@ function TypeRadioBuckets({ problemIndex, customTypes, prompts, selectedTypeId, 
           <div className="oneTypeRadioName">{inf.name}</div>
           <div className="oneTypeRadioDesc">{inf.desc || '—'}</div>
         </div>
+        <button
+          type="button"
+          className="examplePreviewBtn oneTypeExampleBtn"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onOpenExample(c);
+          }}
+        >
+          예시 보기
+        </button>
       </label>
     );
   };
@@ -115,6 +127,45 @@ export default function ExpectedQuestionsPage() {
   const [resultsByIndex, setResultsByIndex] = useState({});
   const [creditsModalOpen, setCreditsModalOpen] = useState(false);
   const [creditsModalMessage, setCreditsModalMessage] = useState('');
+  const [exampleModal, setExampleModal] = useState(null);
+
+  const openExampleModal = useCallback(async (c) => {
+    const title = c?.name || '유형';
+    const typeId = c?.id;
+    if (!typeId) return;
+    setExampleModal({ open: true, typeId, title, status: 'loading' });
+    try {
+      const res = await fetch(`/api/custom-type-example?typeId=${encodeURIComponent(typeId)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId
+            ? { ...prev, status: 'error', err: data.error || `조회 실패 (${res.status})` }
+            : prev,
+        );
+        return;
+      }
+      if (data.found && data.url) {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId
+            ? { ...prev, status: 'ok', url: `${data.url}?v=${Date.now()}` }
+            : prev,
+        );
+      } else {
+        setExampleModal((prev) =>
+          prev && prev.typeId === typeId ? { ...prev, status: 'empty' } : prev,
+        );
+      }
+    } catch (e) {
+      setExampleModal((prev) =>
+        prev && prev.typeId === typeId
+          ? { ...prev, status: 'error', err: e instanceof Error ? e.message : '오류' }
+          : prev,
+      );
+    }
+  }, []);
+
+  const closeExampleModal = useCallback(() => setExampleModal(null), []);
 
   const patchProblem = useCallback((index, patch) => {
     setProblems((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
@@ -231,20 +282,16 @@ export default function ExpectedQuestionsPage() {
           )}
 
           <p className="persistMsg" style={{ marginBottom: 16 }}>
-            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
-            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다.{' '}
           </p>
 
-          <p className="globalPassageHint" style={{ marginBottom: 24 }}>
-            GPT 모델은 <strong>유형 관리</strong>(<code>/types</code>)에서 선택합니다. 기본 <code>gpt-5.4-mini</code>.
-          </p>
+          {/* <p className="globalPassageHint" style={{ marginBottom: 24 }}>
+            GPT 모델은 로그인 시 프로필에 저장된 설정을 사용합니다. 기본은 <code>gpt-5.4-mini</code>입니다.
+          </p> */}
 
           <div className="sectionLabel">문항 구성</div>
           <p className="globalPassageHint" style={{ marginBottom: 16 }}>
-            각 문항을 접었다 펼칠 수 있습니다. Paraphraze는 문항마다 아코디언 안에서 따로 켜거나 끌 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.{' '}
-            <Link href="/types" className="typesEmptyLink">
-              유형 관리
-            </Link>
+            각 문항을 접었다 펼칠 수 있습니다. Paraphraze는 문항마다 아코디언 안에서 따로 켜거나 끌 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.
           </p>
 
           {problems.map((prob, index) => {
@@ -267,19 +314,22 @@ export default function ExpectedQuestionsPage() {
                 <summary className="expectedAccordionSummary">
                   <span className="expectedAccordionNo">{index + 1}번 문제</span>
                   <span className="expectedAccordionMeta">{selectedName}</span>
-                  {problems.length > 1 && (
-                    <button
-                      type="button"
-                      className="btnSm btnGhost expectedAccordionRemove"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        removeProblem(index);
-                      }}
-                    >
-                      문항 삭제
-                    </button>
-                  )}
+                  <span className="expectedAccordionSummaryEnd">
+                    {problems.length > 1 && (
+                      <button
+                        type="button"
+                        className="btnSm btnGhost expectedAccordionRemove"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          removeProblem(index);
+                        }}
+                      >
+                        문항 삭제
+                      </button>
+                    )}
+                    <span className="expectedAccordionChevron" aria-hidden="true" title="접기·펼치기" />
+                  </span>
                 </summary>
                 <div className="paraphraseModelRow paraphraseModelRowSingle expectedAccordionParaphrase">
                   <div className="paraphraseHalf paraphraseHalfFull">
@@ -337,6 +387,7 @@ export default function ExpectedQuestionsPage() {
                         prompts={prompts}
                         selectedTypeId={prob.typeId}
                         onSelectTypeId={(id) => patchProblem(index, { typeId: id })}
+                        onOpenExample={openExampleModal}
                       />
                     )}
                   </aside>
@@ -440,11 +491,68 @@ export default function ExpectedQuestionsPage() {
             </div>
           )}
 
-          <p className="dragHint" style={{ marginTop: 24 }}>
+          {/* <p className="dragHint" style={{ marginTop: 24 }}>
             <Link href="/">← 문제 생성(메인)</Link>
             {' · '}
             <Link href="/one_type">한 유형 일괄</Link>
-          </p>
+          </p> */}
+
+          <div
+            className={`modalOverlay modalZExample ${exampleModal?.open ? 'modalOverlayOpen' : ''}`}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeExampleModal();
+            }}
+            role="presentation"
+          >
+            {exampleModal?.open && (
+              <div
+                className="modal modalExample"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="expected-example-modal-title"
+              >
+                <h3 id="expected-example-modal-title">{exampleModal.title} — 예시 문제</h3>
+                <p className="modalIntro">
+                  이 유형에 등록된 예시 이미지입니다. 파일 경로:{' '}
+                  <code>public/custom-type-examples/</code>
+                </p>
+                {exampleModal.status === 'loading' && (
+                  <div className="exampleModalBody exampleModalLoading">
+                    <span className="spinner" style={{ borderTopColor: 'var(--accent)' }} />
+                    불러오는 중…
+                  </div>
+                )}
+                {exampleModal.status === 'empty' && (
+                  <div className="exampleModalBody">
+                    <p className="exampleEmptyText">예시 이미지가 없습니다.</p>
+                    <p className="formHint">
+                      해당 유형에 예시 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
+                    </p>
+                  </div>
+                )}
+                {exampleModal.status === 'ok' && exampleModal.url && (
+                  <div className="exampleModalBody">
+                    <div className="exampleImageWrap">
+                      <img src={exampleModal.url} alt={`${exampleModal.title} 예시`} className="exampleImage" />
+                    </div>
+                  </div>
+                )}
+                {exampleModal.status === 'error' && (
+                  <div className="exampleModalBody">
+                    <p className="exampleEmptyText" style={{ color: 'var(--danger)' }}>
+                      {exampleModal.err || '오류가 발생했습니다.'}
+                    </p>
+                  </div>
+                )}
+                <div className="modalFooter">
+                  <button type="button" className="btnSm btnPrimary" onClick={closeExampleModal}>
+                    닫기
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
       <InsufficientCreditsModal

@@ -99,7 +99,7 @@ export default function PromptAssistantPage() {
           <span className="logo">QuizForge</span>
           <span className="logoBadge">Prompt helper</span>
         </div>
-        <p className="subtitle">문제 작성용 프롬프트를 대화로 설계·다듬습니다. 완성된 초안은 유형 관리에서 붙여넣으세요.</p>
+        <p className="subtitle">문제 작성용 프롬프트를 대화로 설계·다듬습니다. 완성된 초안은 문제 유형 설정에 붙여넣을 수 있습니다.</p>
       </header>
 
       <div className="sectionLabel">OpenAI API</div>
@@ -136,7 +136,7 @@ export default function PromptAssistantPage() {
         <div className="promptChatLog" role="log" aria-live="polite" aria-relevant="additions">
           {messages.length === 0 && !loading && (
             <p className="promptChatEmpty">
-              예: 「빈칸 어법 문제 프롬프트를 {`{passage}`}만 쓰고 5지선다로 만들어줘」처럼 요청해 보세요.
+              예: 「빈칸 어법 문제 프롬프트를 지문만 넣는 자리로 짜고 5지선다로 만들어줘」처럼 요청해 보세요.
             </p>
           )}
           {messages.map((m, i) => (

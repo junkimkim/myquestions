@@ -74,9 +74,10 @@ function SuccessContent() {
       <p className="dragHint" style={{ marginTop: 24 }}>
         <Link href="/pricing">요금·충전</Link>
         {' · '}
-        <Link href="/mypage">마이페이지</Link>
-        {' · '}
         <Link href="/">문제 생성</Link>
+        {' — 잔액·계정은 상단 '}
+        <strong>마이페이지</strong>
+        {' 메뉴에서 확인하세요.'}
       </p>
     </div>
   );

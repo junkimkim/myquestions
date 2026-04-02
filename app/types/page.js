@@ -162,19 +162,19 @@ export default function TypesManagePage() {
           ? DEFAULT_VOCAB_PROMPT
           : DEFAULT_CUSTOM_PROMPT);
     if (!prompt.includes('{passage}')) {
-      setEditError('프롬프트에 {passage}를 포함해야 합니다.');
+      setEditError('프롬프트에 지문이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
     if (editKind === 'writing' && !prompt.includes('{answer}')) {
-      setEditError('영작 유형은 프롬프트에 {answer}를 포함해야 합니다.');
+      setEditError('영작 유형은 프롬프트에 정답 문장이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
     if (editKind === 'vocabulary' && !prompt.includes('{vocab}')) {
-      setEditError('어휘 유형은 프롬프트에 {vocab}를 포함해야 합니다.');
+      setEditError('어휘 유형은 프롬프트에 어휘 목록이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
     if (editIsDescriptive && editKind === 'mcq' && !prompt.includes('{answer}')) {
-      setEditError('서술형(mcq) 유형은 프롬프트에 {answer}를 포함해야 합니다.');
+      setEditError('서술형(mcq) 유형은 프롬프트에 정답이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
 
@@ -238,15 +238,15 @@ export default function TypesManagePage() {
           ? DEFAULT_VOCAB_PROMPT
           : DEFAULT_CUSTOM_PROMPT);
     if (!prompt.includes('{passage}')) {
-      setFormError('프롬프트에 {passage}를 포함해야 합니다.');
+      setFormError('프롬프트에 지문이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
     if (newKind === 'writing' && !prompt.includes('{answer}')) {
-      setFormError('영작 유형은 프롬프트에 {answer}를 포함해야 합니다.');
+      setFormError('영작 유형은 프롬프트에 정답 문장이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
     if (newKind === 'vocabulary' && !prompt.includes('{vocab}')) {
-      setFormError('어휘 유형은 프롬프트에 {vocab}를 포함해야 합니다.');
+      setFormError('어휘 유형은 프롬프트에 어휘 목록이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
 
@@ -259,7 +259,7 @@ export default function TypesManagePage() {
         ? 'grammar-mcq'
         : null;
     if (storedIsDescriptive && !prompt.includes('{answer}')) {
-      setFormError('서술형 유형은 프롬프트에 {answer}를 포함해야 합니다.');
+      setFormError('서술형 유형은 프롬프트에 정답이 들어갈 자리 표기를 넣어야 합니다.');
       return;
     }
 
@@ -502,7 +502,7 @@ export default function TypesManagePage() {
                 </label>
               </div>
               <p className="formHint">
-                영작: {'{passage}'}, {'{answer}'} 필수 · 어휘: {'{passage}'}, {'{vocab}'} 필수(메인에서 5단어가 {'{vocab}'}로 들어갑니다) · 객관식 어법은 메인에서 보기/오답 5칸 UI가 표시됩니다 · 서술형 선택 시 메인 입력값이 {'{answer}'}로 주입됩니다.
+                영작은 지문·정답 문장 자리, 어휘는 지문·어휘 목록 자리가 필요합니다. 메인에서 입력한 5개 단어가 어휘 목록에 반영됩니다. 객관식 어법은 메인에서 보기·오답 5칸이 열립니다. 서술형은 메인에서 쓴 정답이 그대로 반영됩니다.
               </p>
             </div>
             <div className="formField">
@@ -513,10 +513,10 @@ export default function TypesManagePage() {
                 onChange={(e) => setPromptText(e.target.value)}
                 placeholder={
                   newKind === 'writing'
-                    ? '비우면 영작 기본 템플릿. {passage}·{answer} 필수'
+                    ? '비우면 영작 기본 템플릿. 지문·정답 문장 자리 표기 필수'
                     : newKind === 'vocabulary'
-                      ? '비우면 어휘 기본 템플릿. {passage}·{vocab} 필수'
-                      : '비우면 기본 템플릿. 반드시 {passage} 포함 (밑줄 의미형: {underlined_sentence}도 사용)'
+                      ? '비우면 어휘 기본 템플릿. 지문·어휘 목록 자리 표기 필수'
+                      : '비우면 기본 템플릿. 지문 자리 필수 (밑줄 의미형은 밑줄 표현 자리도 사용)'
                 }
                 style={{ minHeight: 160, fontFamily: 'var(--font-dmono), monospace', fontSize: '0.82rem' }}
               />
@@ -651,7 +651,7 @@ export default function TypesManagePage() {
                 </label>
               </div>
               <p className="formHint">
-                영작은 {'{answer}'}, 어휘는 {'{vocab}'} 포함 여부를 확인하세요. 객관식 어법은 메인에서 보기/오답 5칸 UI가 표시됩니다. 서술형 선택 시 메인 입력값이 {'{answer}'}로 주입됩니다.
+                영작·어휘 유형은 프롬프트에 정답·어휘 자리가 있는지 확인하세요. 객관식 어법은 메인에서 보기·오답 5칸이 열립니다. 서술형은 메인에서 쓴 정답이 반영됩니다.
               </p>
             </div>
             <div className="formField">

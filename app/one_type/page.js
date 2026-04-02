@@ -3,10 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
+import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerateClient';
 import { getTypeInfo, getTypeKind } from '@/lib/defaultPrompts';
 import { MAX_TOKENS_DEFAULT, MAX_TOKENS_WITH_PARAPHRASE, buildUserPrompt } from '@/lib/paraphrasePrompt';
 import { typeNeedsExtraInput } from '@/lib/typeExtraInput';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
+import { toErrorMessage } from '@/lib/toErrorMessage';
+import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
 
 function IconBolt(props) {
   return (
@@ -41,26 +45,19 @@ function IconAlert(props) {
   );
 }
 
-function IconKey(props) {
-  return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-  );
-}
-
 export default function OneTypePage() {
   const { customTypes, prompts, ready, loadError } = useCustomTypesData();
-  const [apiKey, setApiKey] = useState('');
   const [passages, setPassages] = useState(['']);
   const [selectedTypeId, setSelectedTypeId] = useState(null);
   const [paraphraseEnabled, setParaphraseEnabled] = useState(false);
-  const [gptModel, setGptModel] = useState('gpt-4o');
+  const { preferredGptModel } = usePreferredGptModel();
   const [generating, setGenerating] = useState(false);
   const [validationError, setValidationError] = useState(null);
   const [showResults, setShowResults] = useState(false);
   /** @type {Record<number, { status: string, label: string, tagClass: string, text?: string, error?: string }>} */
   const [resultsByIndex, setResultsByIndex] = useState({});
+  const [creditsModalOpen, setCreditsModalOpen] = useState(false);
+  const [creditsModalMessage, setCreditsModalMessage] = useState('');
 
   const passageOnlyTypes = useMemo(
     () => customTypes.filter((c) => !typeNeedsExtraInput(c.id, customTypes, prompts)),
@@ -72,12 +69,6 @@ export default function OneTypePage() {
     if (selectedTypeId && passageOnlyTypes.some((c) => c.id === selectedTypeId)) return;
     setSelectedTypeId(passageOnlyTypes[0]?.id ?? null);
   }, [ready, passageOnlyTypes, selectedTypeId]);
-
-  const apiStatus = useMemo(() => {
-    const k = apiKey.trim();
-    if (k.startsWith('sk-') && k.length > 20) return { text: '입력됨', ok: true };
-    return { text: '미입력', ok: false };
-  }, [apiKey]);
 
   const setPassageAt = useCallback((index, value) => {
     setPassages((prev) => {
@@ -102,12 +93,6 @@ export default function OneTypePage() {
   }, []);
 
   const generateBatch = useCallback(async () => {
-    const key = apiKey.trim();
-    if (!key || !key.startsWith('sk-')) {
-      setValidationError('OpenAI API 키를 입력해주세요. (sk-로 시작)');
-      setShowResults(true);
-      return;
-    }
     if (!selectedTypeId) {
       setValidationError('문제 유형을 하나 선택해 주세요.');
       setShowResults(true);
@@ -142,21 +127,6 @@ export default function OneTypePage() {
     setShowResults(true);
     setResultsByIndex({});
 
-    const runOne = async (body) => {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error?.message || '요청에 실패했습니다.');
-      }
-      const out = data.choices?.[0]?.message?.content;
-      if (out == null) throw new Error('응답 형식이 올바르지 않습니다.');
-      return out;
-    };
-
     const maxTokens = paraphraseEnabled ? MAX_TOKENS_WITH_PARAPHRASE : MAX_TOKENS_DEFAULT;
 
     for (const i of jobIndices) {
@@ -181,9 +151,9 @@ export default function OneTypePage() {
           null,
           null,
         );
-        const out = await runOne({
-          apiKey: key,
-          model: gptModel,
+        const out = await callGeneratePost({
+          typeLabel: info.label,
+          model: preferredGptModel,
           messages: [
             {
               role: 'system',
@@ -199,13 +169,17 @@ export default function OneTypePage() {
           [i]: { status: 'ok', label: info.label, tagClass: info.tagClass, text: out },
         }));
       } catch (err) {
+        if (isInsufficientCreditsError(err)) {
+          setCreditsModalOpen(true);
+          setCreditsModalMessage(err.message);
+        }
         setResultsByIndex((prev) => ({
           ...prev,
           [i]: {
             status: 'error',
             label: info.label,
             tagClass: info.tagClass,
-            error: err instanceof Error ? err.message : String(err),
+            error: toErrorMessage(err),
           },
         }));
       }
@@ -213,18 +187,17 @@ export default function OneTypePage() {
 
     setGenerating(false);
   }, [
-    apiKey,
     passages,
     selectedTypeId,
     customTypes,
     prompts,
     paraphraseEnabled,
-    gptModel,
+    preferredGptModel,
   ]);
 
   return (
     <div className="container">
-      <QuizForgeNav />
+
       <header>
         <div className="logoRow">
           <span className="logo">QuizForge</span>
@@ -232,7 +205,7 @@ export default function OneTypePage() {
         </div>
         <p className="subtitle">여러 지문에 같은 유형의 변형문제를 순서대로 만듭니다. (지문만으로 생성 가능한 유형만)</p>
       </header>
-
+      <QuizForgeNav />
       {!ready ? (
         <p className="subtitle">불러오는 중…</p>
       ) : (
@@ -243,18 +216,10 @@ export default function OneTypePage() {
             </p>
           )}
 
-          <div className="sectionLabel">API 설정</div>
-          <div className="apiRow">
-            <IconKey />
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              autoComplete="off"
-            />
-            <span className={`apiStatus ${apiStatus.ok ? 'apiStatusOk' : 'apiStatusEmpty'}`}>{apiStatus.text}</span>
-          </div>
+          <p className="persistMsg" style={{ marginBottom: 16 }}>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
+            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+          </p>
 
           <div className="mainWorkRow">
             <div className="mainWorkColLeft">
@@ -293,8 +258,8 @@ export default function OneTypePage() {
                   지문 추가
                 </button>
 
-                <div className="paraphraseModelRow" style={{ marginTop: 20 }}>
-                  <div className="paraphraseHalf">
+                <div className="paraphraseModelRow paraphraseModelRowSingle" style={{ marginTop: 20 }}>
+                  <div className="paraphraseHalf paraphraseHalfFull">
                     <div className="paraphraseRow">
                       <input
                         id="paraphrase-check-onetype"
@@ -310,34 +275,10 @@ export default function OneTypePage() {
                       </label>
                     </div>
                   </div>
-                  <div className="modelSelectHalf">
-                    <div className="modelSelectCard">
-                      <label htmlFor="gpt-model-onetype" className="modelSelectLabel">
-                        GPT 모델
-                      </label>
-                      <select
-                        id="gpt-model-onetype"
-                        className="modelSelect"
-                        value={gptModel}
-                        onChange={(e) => setGptModel(e.target.value)}
-                      >
-                        <optgroup label="GPT-5">
-                          <option value="gpt-5.1">gpt-5.1</option>
-                          <option value="gpt-5">gpt-5</option>
-                          <option value="gpt-5-mini">gpt-5-mini</option>
-                          <option value="gpt-5-nano">gpt-5-nano</option>
-                          <option value="gpt-5-chat-latest">gpt-5-chat-latest</option>
-                        </optgroup>
-                        <optgroup label="GPT-4 / 이전">
-                          <option value="gpt-4o">gpt-4o</option>
-                          <option value="gpt-4o-mini">gpt-4o-mini</option>
-                          <option value="gpt-4-turbo">gpt-4-turbo</option>
-                          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                  </div>
                 </div>
+                <p className="globalPassageHint" style={{ marginTop: 8 }}>
+                  GPT 모델은 <strong>유형 관리</strong>(<code>/types</code>)에서 선택합니다.
+                </p>
               </div>
             </div>
 
@@ -479,6 +420,11 @@ export default function OneTypePage() {
           </p>
         </>
       )}
+      <InsufficientCreditsModal
+        open={creditsModalOpen}
+        onClose={() => setCreditsModalOpen(false)}
+        message={creditsModalMessage}
+      />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import QuizForgeNav from '@/components/QuizForgeNav';
 import {
   DEFAULT_VOCAB_PROMPT,
   DEFAULT_WRITING_PROMPT,
-  defaultCustomPromptForKind,
   getTypeInfo,
   getTypeKind,
 } from '@/lib/defaultPrompts';
@@ -16,7 +15,11 @@ import {
   applyGrammarSlotPlaceholders,
   buildUserPrompt,
 } from '@/lib/paraphrasePrompt';
+import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
+import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerateClient';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
+import { toErrorMessage } from '@/lib/toErrorMessage';
+import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
 import { formatVocabList } from '@/lib/vocabPrompt';
 import {
   GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID,
@@ -36,14 +39,6 @@ import {
   promptRequiresVoca,
   typeNeedsExtraInput as computeTypeNeedsExtraInput,
 } from '@/lib/typeExtraInput';
-
-function IconKey(props) {
-  return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-  );
-}
 
 function IconCheck(props) {
   return (
@@ -65,15 +60,6 @@ function IconDownload(props) {
   return (
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
       <path d="M12 15V3m0 12l-4-4m4 4l4-4M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17" />
-    </svg>
-  );
-}
-
-function IconSettings(props) {
-  return (
-    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
@@ -110,9 +96,7 @@ export default function Home() {
     ready,
     loadError,
     updateCustomType,
-    bulkUpsertPrompts,
   } = useCustomTypesData();
-  const [apiKey, setApiKey] = useState('');
   const [passage, setPassage] = useState('');
   const [vocabWords, setVocabWords] = useState(['', '', '', '', '']);
   const [awkwardVocaWords, setAwkwardVocaWords] = useState(['', '', '', '', '']);
@@ -120,11 +104,8 @@ export default function Home() {
   const [grammarAnswerForms, setGrammarAnswerForms] = useState(['', '', '', '', '']);
   const [writingAnswer, setWritingAnswer] = useState('');
   const [paraphraseEnabled, setParaphraseEnabled] = useState(false);
-  const [gptModel, setGptModel] = useState('gpt-4o');
+  const { preferredGptModel } = usePreferredGptModel();
   const [activeTypes, setActiveTypes] = useState([]);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [promptDrafts, setPromptDrafts] = useState({});
-  const [promptEditTypeId, setPromptEditTypeId] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState({});
   const [resultOrder, setResultOrder] = useState([]);
@@ -143,6 +124,8 @@ export default function Home() {
   const [specialDescriptiveAnswerCount, setSpecialDescriptiveAnswerCount] = useState(1);
   const [specialDescriptiveAnswerEntries, setSpecialDescriptiveAnswerEntries] = useState(['']);
   const [supplementFocusTypeId, setSupplementFocusTypeId] = useState(null);
+  const [creditsModalOpen, setCreditsModalOpen] = useState(false);
+  const [creditsModalMessage, setCreditsModalMessage] = useState('');
 
   useEffect(() => {
     if (!ready) return;
@@ -167,12 +150,6 @@ export default function Home() {
   }, []);
 
   const typeIds = useMemo(() => customTypes.map((c) => c.id), [customTypes]);
-
-  const apiStatus = useMemo(() => {
-    const k = apiKey.trim();
-    if (k.startsWith('sk-') && k.length > 20) return { text: '입력됨', ok: true };
-    return { text: '미입력', ok: false };
-  }, [apiKey]);
 
   const activeCount = useMemo(
     () => typeIds.filter((id) => activeTypes.includes(id)).length,
@@ -330,51 +307,6 @@ export default function Home() {
     setActiveTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
   }, []);
 
-  const promptModalTypeIds = useMemo(() => {
-    if (!promptEditTypeId) return customTypes.map((c) => c.id);
-    return customTypes.some((c) => c.id === promptEditTypeId) ? [promptEditTypeId] : [];
-  }, [customTypes, promptEditTypeId]);
-
-  const openModal = useCallback((typeId = null) => {
-    const draft = {};
-    for (const c of customTypes) {
-      draft[c.id] = prompts[c.id] ?? defaultCustomPromptForKind(getTypeKind(c));
-    }
-    setPromptDrafts(draft);
-    setPromptEditTypeId(typeId);
-    setModalOpen(true);
-  }, [prompts, customTypes]);
-
-  const closeModal = useCallback(() => {
-    setModalOpen(false);
-    setPromptEditTypeId(null);
-  }, []);
-
-  const savePromptsFromModal = useCallback(async () => {
-    const items = customTypes
-      .filter((c) => promptModalTypeIds.includes(c.id))
-      .map((c) => ({
-      id: c.id,
-      name: c.name,
-      desc: c.desc || '',
-      kind: getTypeKind(c),
-      prompt: promptDrafts[c.id] ?? '',
-      }));
-    const res = await bulkUpsertPrompts(items);
-    if (res.ok) closeModal();
-  }, [customTypes, promptModalTypeIds, promptDrafts, bulkUpsertPrompts, closeModal]);
-
-  const resetPrompts = useCallback(() => {
-    setPromptDrafts((prev) => {
-      const next = { ...prev };
-      for (const c of customTypes) {
-        if (!promptModalTypeIds.includes(c.id)) continue;
-        next[c.id] = defaultCustomPromptForKind(getTypeKind(c));
-      }
-      return next;
-    });
-  }, [customTypes, promptModalTypeIds]);
-
   const openExampleModal = useCallback(async (c) => {
     const title = c?.name || '유형';
     const typeId = c?.id;
@@ -421,7 +353,6 @@ export default function Home() {
   }, []);
 
   const generateQuestions = useCallback(async () => {
-    const key = apiKey.trim();
     const text = passage.trim();
     const customActive = typeIds.filter((id) => activeTypes.includes(id));
     const wordsTrim = vocabWords.map((w) => w.trim());
@@ -431,10 +362,6 @@ export default function Home() {
     const hasAnyGrammarAnswerInput = grammarAnswersTrim.some((w) => Boolean(w));
     const grammarAnswerCount = grammarAnswersTrim.filter(Boolean).length;
 
-    if (!key || !key.startsWith('sk-')) {
-      showError('OpenAI API 키를 입력해주세요. (sk-로 시작)');
-      return;
-    }
     if (customActive.length === 0) {
       showError('최소 한 가지 문제 유형을 선택해주세요.');
       return;
@@ -562,21 +489,6 @@ export default function Home() {
     setShowResults(true);
     setResults({});
     setResultOrder(jobs);
-
-    const runOne = async (body) => {
-      const res = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        throw new Error(data.error?.message || '요청에 실패했습니다.');
-      }
-      const out = data.choices?.[0]?.message?.content;
-      if (out == null) throw new Error('응답 형식이 올바르지 않습니다.');
-      return out;
-    };
 
     for (const type of jobs) {
       const info = getTypeInfo(type, customTypes);
@@ -750,9 +662,9 @@ export default function Home() {
             grammarNeedsPassageExprsFive(type, customTypes, prompts) ? grammarExprsTrim : null,
             grammarNeedsAnswerFormsFive(type, customTypes) ? grammarAnswersTrim : null,
           );
-          const out = await runOne({
-            apiKey: key,
-            model: gptModel,
+          const out = await callGeneratePost({
+            typeLabel: label,
+            model: preferredGptModel,
             messages: [
               {
                 role: 'system',
@@ -828,9 +740,9 @@ export default function Home() {
           grammarAnswerSlotsForPrompt,
         );
         const maxTokens = paraphraseEnabled ? MAX_TOKENS_WITH_PARAPHRASE : MAX_TOKENS_DEFAULT;
-        const out = await runOne({
-          apiKey: key,
-          model: gptModel,
+        const out = await callGeneratePost({
+          typeLabel: label,
+          model: preferredGptModel,
           messages: [
             {
               role: 'system',
@@ -847,13 +759,17 @@ export default function Home() {
           [type]: { status: 'ok', label, tagClass, text: out },
         }));
       } catch (err) {
+        if (isInsufficientCreditsError(err)) {
+          setCreditsModalOpen(true);
+          setCreditsModalMessage(err.message);
+        }
         setResults((prev) => ({
           ...prev,
           [type]: {
             status: 'error',
             label,
             tagClass,
-            error: err instanceof Error ? err.message : String(err),
+            error: toErrorMessage(err),
           },
         }));
       }
@@ -861,7 +777,6 @@ export default function Home() {
 
     setGenerating(false);
   }, [
-    apiKey,
     passage,
     vocabWords,
     awkwardVocaWords,
@@ -879,7 +794,7 @@ export default function Home() {
     specialDescriptiveAnswerCount,
     specialDescriptiveAnswerEntries,
     paraphraseEnabled,
-    gptModel,
+    preferredGptModel,
     activeTypes,
     prompts,
     showError,
@@ -1031,17 +946,6 @@ export default function Home() {
           >
             예시 보기
           </button>
-          <button
-            type="button"
-            className="examplePreviewBtn promptEditBtn"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              openModal(c.id);
-            }}
-          >
-            프롬프트
-          </button>
         </div>
       </div>
     );
@@ -1062,8 +966,8 @@ export default function Home() {
           />
           <span className="charCount">{passage.length.toLocaleString()}자</span>
         </div>
-        <div className="paraphraseModelRow">
-          <div className="paraphraseHalf">
+        <div className="paraphraseModelRow paraphraseModelRowSingle">
+          <div className="paraphraseHalf paraphraseHalfFull">
             <div className="paraphraseRow">
               <input
                 id="paraphrase-check-main"
@@ -1079,29 +983,10 @@ export default function Home() {
               </label>
             </div>
           </div>
-          <div className="modelSelectHalf">
-            <div className="modelSelectCard">
-              <label htmlFor="gpt-model-main" className="modelSelectLabel">
-                GPT 모델
-              </label>
-              <select id="gpt-model-main" className="modelSelect" value={gptModel} onChange={(e) => setGptModel(e.target.value)}>
-                <optgroup label="GPT-5">
-                  <option value="gpt-5.1">gpt-5.1</option>
-                  <option value="gpt-5">gpt-5</option>
-                  <option value="gpt-5-mini">gpt-5-mini</option>
-                  <option value="gpt-5-nano">gpt-5-nano</option>
-                  <option value="gpt-5-chat-latest">gpt-5-chat-latest</option>
-                </optgroup>
-                <optgroup label="GPT-4 / 이전">
-                  <option value="gpt-4o">gpt-4o</option>
-                  <option value="gpt-4o-mini">gpt-4o-mini</option>
-                  <option value="gpt-4-turbo">gpt-4-turbo</option>
-                  <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                </optgroup>
-              </select>
-            </div>
-          </div>
         </div>
+        <p className="globalPassageHint" style={{ marginTop: -20, marginBottom: 24 }}>
+          사용할 GPT 모델은 <strong>유형 관리</strong>(주소 <code>/types</code>)에서 선택합니다. 기본은 <code>gpt-5.4-mini</code>입니다.
+        </p>
       </div>
     );
   }
@@ -1501,7 +1386,7 @@ export default function Home() {
 
   return (
     <div className="container">
-      <QuizForgeNav />
+      
       <header>
         <div className="logoRow">
           <span className="logo">QuizForge</span>
@@ -1509,7 +1394,7 @@ export default function Home() {
         </div>
         <p className="subtitle">영어 지문 → AI 변형문제 자동 생성 · Word 파일 다운로드</p>
       </header>
-
+      <QuizForgeNav />
       {!ready ? (
         <p className="subtitle">불러오는 중…</p>
       ) : (
@@ -1519,18 +1404,10 @@ export default function Home() {
               문제 유형을 불러오지 못했습니다: {loadError}
             </p>
           )}
-          <div className="sectionLabel">API 설정</div>
-          <div className="apiRow">
-            <IconKey />
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              autoComplete="off"
-            />
-            <span className={`apiStatus ${apiStatus.ok ? 'apiStatusOk' : 'apiStatusEmpty'}`}>{apiStatus.text}</span>
-          </div>
+          <p className="persistMsg" style={{ marginBottom: 16 }}>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
+            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+          </p>
 
           <div className="mainWorkRow">
             <div className="mainWorkColLeft">
@@ -1577,21 +1454,14 @@ export default function Home() {
                 </button>
               </div>
               <p className="dragHint">
-                왼쪽에서 지문·모델을 설정합니다. 상단은 지문만으로 생성 가능한 유형, 하단은 추가 입력이 필요한 유형입니다. ≡ 드래그로 이 목록 구역에 놓으면 객관식으로 바뀝니다(서술형·영작·어휘는{' '}
-                <Link href="/types" className="typesEmptyLink">
-                  유형 관리
-                </Link>
-                ).
+                왼쪽에서 지문·모델을 설정합니다. 상단은 지문만으로 생성 가능한 유형, 하단은 추가 입력이 필요한 유형입니다. ≡ 드래그로 이 목록 구역에 놓으면 객관식으로 바뀝니다(서술형·영작·어휘는 유형 관리에서 설정).
               </p>
 
               {customTypes.length === 0 && (
                 <div className="typesEmptyCard">
                   <p className="typesEmptyTitle">등록된 맞춤 문제 유형이 없습니다.</p>
                   <p className="typesEmptyText">
-                    <Link href="/types" className="typesEmptyLink">
-                      유형 관리
-                    </Link>
-                    에서 객관식·서술형·영작·어휘 유형을 추가할 수 있습니다.
+                    유형 관리 페이지에서 객관식·서술형·영작·어휘 유형을 추가할 수 있습니다. (주소창에 <code>/types</code> 입력)
                   </p>
                 </div>
               )}
@@ -1611,15 +1481,6 @@ export default function Home() {
                 </>
               )}
 
-              <div className="typesActions">
-                <Link href="/types" className="addTypeBtn addTypeBtnLink">
-                  유형 관리에서 추가·삭제
-                </Link>
-                <button type="button" className="settingsBtn" onClick={openModal} disabled={customTypes.length === 0}>
-                  <IconSettings />
-                  프롬프트 설정 편집
-                </button>
-              </div>
             </aside>
           </div>
 
@@ -1716,77 +1577,6 @@ export default function Home() {
           )}
 
           <div
-            className={`modalOverlay ${modalOpen ? 'modalOverlayOpen' : ''}`}
-            onClick={(e) => {
-              if (e.target === e.currentTarget) closeModal();
-            }}
-            role="presentation"
-          >
-            {modalOpen && (
-              <div
-                className="modal modalWide"
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="modal-title"
-              >
-                <h3 id="modal-title">
-                  {promptEditTypeId
-                    ? `프롬프트 설정 — ${getTypeInfo(promptEditTypeId, customTypes).name}`
-                    : '프롬프트 설정'}
-                </h3>
-                <p className="modalIntro">
-                  각 유형별 GPT 지시문을 수정할 수 있습니다. <code>{'{passage}'}</code>는 입력 지문으로 치환됩니다(어휘 유형에서 지문 없이 생성하면 빈 문자열). 영작은 메인 정답이{' '}
-                  <code>{'{answer}'}</code>, 어휘는 메인 5단어 목록이 <code>{'{vocab}'}</code>로 들어갑니다. 객관식에서{' '}
-                  <code>{'{voca}'}</code>는 문맥상 어색한 낱말용 5칸, <code>{'{grammar_exprs}'}</code>·<code>{'{grammar_answer}'}</code>는 메인에서 입력한 보기·틀린 보기 5칸을 번호 목록 문자열로 치환합니다. 번호별로 쓰려면{' '}
-                  <code>{'{grammar_expr_1}'}</code>~<code>{'{grammar_expr_5}'}</code>, <code>{'{grammar_answer_1}'}</code>~<code>{'{grammar_answer_5}'}</code> 또는 짝 블록 <code>{'{grammar_pairs}'}</code>를 사용하세요.
-                </p>
-                {customTypes
-                  .filter((c) => promptModalTypeIds.includes(c.id))
-                  .map((c) => {
-                  const info = getTypeInfo(c.id, customTypes);
-                  return (
-                    <div key={c.id} className="promptItem">
-                      <div className="promptLabel">
-                        <span className={`typeTag ${info.tagClass}`} style={{ fontSize: '0.65rem' }}>
-                          {info.name}
-                        </span>
-                        {info.kind === 'writing' && (
-                          <span className="typesKindBadge typesKindBadgeWriting" style={{ marginLeft: 8 }}>
-                            영작
-                          </span>
-                        )}
-                        {info.kind === 'vocabulary' && (
-                          <span className="typesKindBadge typesKindBadgeVocab" style={{ marginLeft: 8 }}>
-                            어휘
-                          </span>
-                        )}
-                        {info.kind === 'mcq' && c.is_descriptive && (
-                          <span className="typesKindBadge typesKindBadgeWriting" style={{ marginLeft: 8 }}>
-                            서술형
-                          </span>
-                        )}
-                      </div>
-                      <textarea
-                        value={promptDrafts[c.id] ?? ''}
-                        onChange={(e) => setPromptDrafts((d) => ({ ...d, [c.id]: e.target.value }))}
-                      />
-                    </div>
-                  );
-                  })}
-                <div className="modalFooter">
-                  <button type="button" className="btnSm btnGhost" onClick={resetPrompts}>
-                    기본값으로 초기화
-                  </button>
-                  <button type="button" className="btnSm btnPrimary" onClick={savePromptsFromModal}>
-                    저장
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div
             className={`modalOverlay modalZExample ${exampleModal?.open ? 'modalOverlayOpen' : ''}`}
             onClick={(e) => {
               if (e.target === e.currentTarget) closeExampleModal();
@@ -1816,10 +1606,7 @@ export default function Home() {
                   <div className="exampleModalBody">
                     <p className="exampleEmptyText">예시 이미지가 없습니다.</p>
                     <p className="formHint">
-                      <Link href="/types" className="typesEmptyLink">
-                        유형 관리
-                      </Link>
-                      에서 해당 유형에 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
+                      유형 관리(/types)에서 해당 유형에 이미지를 등록하거나, 저장소에 이미지 파일을 추가하세요.
                     </p>
                   </div>
                 )}
@@ -1847,6 +1634,11 @@ export default function Home() {
           </div>
         </>
       )}
+      <InsufficientCreditsModal
+        open={creditsModalOpen}
+        onClose={() => setCreditsModalOpen(false)}
+        message={creditsModalMessage}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   DEFAULT_CUSTOM_PROMPT,
   DEFAULT_VOCAB_PROMPT,
@@ -9,6 +9,9 @@ import {
   getTypeKind,
 } from '@/lib/defaultPrompts';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import GptModelSelect from '@/components/GptModelSelect';
+import { DEFAULT_GPT_MODEL, isAllowedGptModelId } from '@/lib/openaiModels';
+import { toErrorMessage } from '@/lib/toErrorMessage';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 
 function errorToMessage(err, fallback) {
@@ -58,6 +61,50 @@ export default function TypesManagePage() {
   const [editExampleFile, setEditExampleFile] = useState(null);
   const [editError, setEditError] = useState('');
   const [editOk, setEditOk] = useState('');
+
+  const [preferredGptModel, setPreferredGptModel] = useState(DEFAULT_GPT_MODEL);
+  const [gptPrefsLoaded, setGptPrefsLoaded] = useState(false);
+  const [gptPrefsError, setGptPrefsError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/me/preferences', { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && typeof data.preferredGptModel === 'string' && isAllowedGptModelId(data.preferredGptModel)) {
+          setPreferredGptModel(data.preferredGptModel);
+        }
+      } catch {
+        /* 기본값 유지 */
+      } finally {
+        if (!cancelled) setGptPrefsLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const onPreferredGptModelChange = useCallback(async (e) => {
+    const v = e.target.value;
+    setPreferredGptModel(v);
+    setGptPrefsError(null);
+    try {
+      const res = await fetch('/api/me/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preferredGptModel: v }),
+        credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setGptPrefsError(typeof data.error === 'string' ? data.error : '모델을 저장할 수 없습니다. 로그인해 주세요.');
+      }
+    } catch (err) {
+      setGptPrefsError(toErrorMessage(err));
+    }
+  }, []);
 
   const resetForm = useCallback(() => {
     setName('');
@@ -279,6 +326,26 @@ export default function TypesManagePage() {
         </div>
         <p className="subtitle">문제 유형·프롬프트·예시 이미지를 등록합니다. 메인 화면에서 유형을 선택해 문제를 생성하세요.</p>
       </header>
+
+      <div className="modelSelectCard" style={{ maxWidth: 420, marginBottom: 28 }}>
+        <label htmlFor="types-gpt-model" className="modelSelectLabel">
+          생성에 사용할 GPT 모델
+        </label>
+        <GptModelSelect
+          id="types-gpt-model"
+          value={preferredGptModel}
+          onChange={onPreferredGptModelChange}
+          disabled={!gptPrefsLoaded}
+        />
+        <p className="formHint" style={{ marginTop: 10, marginBottom: 0 }}>
+          로그인한 경우 프로필에 저장됩니다. 미로그인 시 이 브라우저 세션에서는 기본값({DEFAULT_GPT_MODEL})으로 생성됩니다.
+        </p>
+        {gptPrefsError && (
+          <p className="persistMsg persistMsgErr" style={{ marginTop: 10, marginBottom: 0 }}>
+            {gptPrefsError}
+          </p>
+        )}
+      </div>
 
       {!ready ? (
         <p className="subtitle">불러오는 중…</p>

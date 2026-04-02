@@ -1,3 +1,5 @@
+import { DEFAULT_GPT_MODEL, isGpt5FamilyModel } from '@/lib/openaiModels';
+
 const PROMPT_ASSISTANT_SYSTEM = `당신은 고등학교 내신 영어 문제 출제를 위한 "변형 문제 생성" 앱(QuizForge)에서 쓰는 프롬프트 작성을 돕는 조력자입니다.
 
 [앱에서 쓰는 플레이스홀더]
@@ -41,14 +43,14 @@ export async function POST(request) {
     return Response.json({ error: { message: '유효한 대화 메시지가 없습니다.' } }, { status: 400 });
   }
 
-  const resolvedModel = model || 'gpt-5-mini';
+  const resolvedModel = typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_GPT_MODEL;
   const openaiBody = {
     model: resolvedModel,
     messages: [{ role: 'system', content: PROMPT_ASSISTANT_SYSTEM }, ...safeMessages],
     max_tokens: Math.min(Math.max(Number(max_tokens) || 2500, 256), 8192),
   };
 
-  if (!/^gpt-5/i.test(resolvedModel)) {
+  if (!isGpt5FamilyModel(resolvedModel)) {
     openaiBody.temperature = 0.65;
   }
 

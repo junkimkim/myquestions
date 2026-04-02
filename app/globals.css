@@ -129,9 +129,381 @@ body::before {
 
 .appNav {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 20px;
   flex-wrap: wrap;
+}
+
+.appNavMain {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.authNavUser {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.authNavMuted {
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+
+.authNavLogout {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.authNavLogout:hover {
+  color: var(--accent);
+  border-color: rgba(232, 200, 125, 0.35);
+}
+
+.authLoginPage {
+  padding-bottom: 48px;
+}
+
+.authLoginCard {
+  max-width: 400px;
+  padding: 28px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.authOAuthBtn {
+  display: block;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 14px 18px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.authOAuthBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.authOAuthGoogle {
+  background: #fff;
+  color: #1f1f1f;
+}
+
+.authOAuthKakao {
+  background: #fee500;
+  color: #191919;
+  border-color: #e6cf00;
+}
+
+.authLoginHint {
+  margin-top: 18px;
+  font-size: 0.78rem;
+  color: var(--text2);
+}
+
+.mypageCard {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  max-width: 520px;
+}
+
+.mypageRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.mypageLabel {
+  min-width: 88px;
+  color: var(--text2);
+  font-size: 0.8rem;
+}
+
+.mypageAvatar {
+  border-radius: 8px;
+  vertical-align: middle;
+}
+
+.mypageCardWide {
+  max-width: 720px;
+}
+
+.mypageJobList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.mypageJobItem {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.mypageJobItem:last-child {
+  border-bottom: none;
+}
+
+.mypageJobMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--text2);
+  align-items: center;
+  width: 100%;
+}
+
+.mypageJobBadge {
+  text-transform: uppercase;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+}
+
+.mypageJobModel {
+  font-family: ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.mypageJobPreview {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.mypageJobDetailLink {
+  margin-left: auto;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.mypageJobDetailLink:hover {
+  text-decoration: underline;
+}
+
+.mypageJobDetailBody {
+  margin: 12px 0 0;
+  padding: 16px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  max-height: min(70vh, 560px);
+  overflow: auto;
+}
+
+.authNavWallet {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(232, 200, 125, 0.25);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.authNavWallet:hover {
+  border-color: rgba(232, 200, 125, 0.45);
+}
+
+.authNavWalletN {
+  font-variant-numeric: tabular-nums;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 10, 14, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 400px;
+  padding: 24px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.modalTitle {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.modalBody {
+  margin: 0 0 20px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text2);
+}
+
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modalBtn {
+  min-width: 120px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+}
+
+.pricingNotice {
+  padding: 16px 18px;
+  margin-bottom: 24px;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 200, 125, 0.25);
+  background: rgba(232, 200, 125, 0.06);
+  font-size: 0.88rem;
+  line-height: 1.55;
+  max-width: 720px;
+}
+
+.pricingGrid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  max-width: 900px;
+}
+
+.pricingCard {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.pricingCardName {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+
+.pricingCardCredits {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.pricingCardPrice {
+  font-size: 1rem;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.pricingCardNote {
+  font-size: 0.82rem;
+  color: var(--text2);
+  margin: 0 0 12px;
+}
+
+.pricingCardSoon {
+  display: inline-block;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(120, 120, 130, 0.25);
+  color: var(--text2);
+}
+
+.pricingPayBtn {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+}
+
+.pricingWidgetSection {
+  max-width: 520px;
+}
+
+.pricingBackBtn {
+  margin-bottom: 16px;
+}
+
+.pricingWidgetOrderMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 16px;
+  font-size: 0.95rem;
+}
+
+.pricingWidgetAmount {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.tossWidgetMount {
+  min-height: 80px;
+  margin-bottom: 16px;
+}
+
+.tossWidgetMountAgreement {
+  min-height: 48px;
+}
+
+.pricingWidgetPayBtn {
+  margin-top: 8px;
+}
+
+.paymentResultInner {
+  max-width: 520px;
+  padding: 8px 0 24px;
 }
 
 .appNavLink {
@@ -492,6 +864,10 @@ header {
 .modelSelectHalf {
   flex: 1 1 calc(50% - 7px);
   min-width: 0;
+}
+
+.paraphraseModelRowSingle .paraphraseHalfFull {
+  flex: 1 1 100%;
 }
 
 .modelSelectHalf {
@@ -1960,6 +2336,11 @@ details[open] > .expectedAccordionSummary::before {
 
 .expectedAccordionRemove {
   margin-left: auto;
+}
+
+.expectedAccordionParaphrase.paraphraseModelRow {
+  margin-bottom: 12px;
+  padding: 12px 16px 0;
 }
 
 .expectedProblemInner {

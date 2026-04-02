@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toErrorMessage } from '@/lib/toErrorMessage';
 
 export function useCustomTypesData() {
   const [customTypes, setCustomTypes] = useState([]);
@@ -27,7 +28,7 @@ export function useCustomTypesData() {
       hydratedRef.current = true;
       setReady(true);
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : String(e));
+      setLoadError(toErrorMessage(e));
       setCustomTypes([]);
       setPrompts({});
       hydratedRef.current = true;

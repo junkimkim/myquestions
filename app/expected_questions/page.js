@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
 import ProblemSupplementFields from '@/components/ProblemSupplementFields';
 import { getTypeInfo } from '@/lib/defaultPrompts';
 import { createEmptyProblemState } from '@/lib/expectedProblemState';
 import { runExpectedProblemGeneration, validateExpectedProblem } from '@/lib/runExpectedProblemGeneration';
 import { typeNeedsExtraInput } from '@/lib/typeExtraInput';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
+import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
 
 const MAX_PROBLEMS = 30;
 
@@ -45,14 +47,6 @@ function IconAlert(props) {
     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
       <circle cx="12" cy="12" r="10" />
       <path d="M12 8v4m0 4h.01" />
-    </svg>
-  );
-}
-
-function IconKey(props) {
-  return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" {...props}>
-      <path d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
     </svg>
   );
 }
@@ -110,9 +104,7 @@ function TypeRadioBuckets({ problemIndex, customTypes, prompts, selectedTypeId, 
 
 export default function ExpectedQuestionsPage() {
   const { customTypes, prompts, ready, loadError } = useCustomTypesData();
-  const [apiKey, setApiKey] = useState('');
-  const [paraphraseEnabled, setParaphraseEnabled] = useState(false);
-  const [gptModel, setGptModel] = useState('gpt-4o');
+  const { preferredGptModel } = usePreferredGptModel();
   const [problems, setProblems] = useState([createProblemSlot()]);
   /** 각 문항 `<details>` 펼침 — React는 `defaultOpen` 대신 `open`+`onToggle` 사용 */
   const [accordionOpen, setAccordionOpen] = useState([true]);
@@ -121,12 +113,8 @@ export default function ExpectedQuestionsPage() {
   const [showResults, setShowResults] = useState(false);
   /** @type {Record<number, { status: string, label: string, tagClass: string, text?: string, error?: string }>} */
   const [resultsByIndex, setResultsByIndex] = useState({});
-
-  const apiStatus = useMemo(() => {
-    const k = apiKey.trim();
-    if (k.startsWith('sk-') && k.length > 20) return { text: '입력됨', ok: true };
-    return { text: '미입력', ok: false };
-  }, [apiKey]);
+  const [creditsModalOpen, setCreditsModalOpen] = useState(false);
+  const [creditsModalMessage, setCreditsModalMessage] = useState('');
 
   const patchProblem = useCallback((index, patch) => {
     setProblems((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
@@ -151,13 +139,6 @@ export default function ExpectedQuestionsPage() {
   }, []);
 
   const runBatch = useCallback(async () => {
-    const key = apiKey.trim();
-    if (!key || !key.startsWith('sk-')) {
-      setValidationError('OpenAI API 키를 입력해주세요. (sk-로 시작)');
-      setShowResults(true);
-      return;
-    }
-
     for (let i = 0; i < problems.length; i += 1) {
       const p = problems[i];
       const err = validateExpectedProblem(i + 1, p, p.typeId, customTypes, prompts);
@@ -186,9 +167,8 @@ export default function ExpectedQuestionsPage() {
       const res = await runExpectedProblemGeneration({
         problem: p,
         typeId,
-        apiKey: key,
-        model: gptModel,
-        paraphraseEnabled,
+        model: preferredGptModel,
+        paraphraseEnabled: Boolean(p.paraphraseEnabled),
         customTypes,
         prompts,
       });
@@ -199,6 +179,21 @@ export default function ExpectedQuestionsPage() {
           [i]: { status: 'ok', label: info.label, tagClass: info.tagClass, text: res.text },
         }));
       } else {
+        if (res.insufficientCredits) {
+          setCreditsModalOpen(true);
+          setCreditsModalMessage(res.error ?? '');
+          setResultsByIndex((prev) => ({
+            ...prev,
+            [i]: {
+              status: 'error',
+              label: info.label,
+              tagClass: info.tagClass,
+              error: res.error,
+            },
+          }));
+          setGenerating(false);
+          return;
+        }
         setResultsByIndex((prev) => ({
           ...prev,
           [i]: {
@@ -212,11 +207,11 @@ export default function ExpectedQuestionsPage() {
     }
 
     setGenerating(false);
-  }, [apiKey, problems, customTypes, prompts, gptModel, paraphraseEnabled]);
+  }, [problems, customTypes, prompts, preferredGptModel]);
 
   return (
     <div className="container">
-      <QuizForgeNav />
+
       <header>
         <div className="logoRow">
           <span className="logo">QuizForge</span>
@@ -224,7 +219,7 @@ export default function ExpectedQuestionsPage() {
         </div>
         <p className="subtitle">한 회분(1~{MAX_PROBLEMS}문항) 예상문제를 지문·유형별로 구성해 순서대로 생성합니다.</p>
       </header>
-
+      <QuizForgeNav />
       {!ready ? (
         <p className="subtitle">불러오는 중…</p>
       ) : (
@@ -235,61 +230,18 @@ export default function ExpectedQuestionsPage() {
             </p>
           )}
 
-          <div className="sectionLabel">API 설정</div>
-          <div className="apiRow">
-            <IconKey />
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              autoComplete="off"
-            />
-            <span className={`apiStatus ${apiStatus.ok ? 'apiStatusOk' : 'apiStatusEmpty'}`}>{apiStatus.text}</span>
-          </div>
+          <p className="persistMsg" style={{ marginBottom: 16 }}>
+            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다. OpenAI는 서버에서 호출됩니다.{' '}
+            <Link href="/login">로그인</Link> · <Link href="/mypage">마이페이지</Link>
+          </p>
 
-          <div className="paraphraseModelRow" style={{ marginBottom: 24 }}>
-            <div className="paraphraseHalf">
-              <div className="paraphraseRow">
-                <input
-                  id="paraphrase-check-exp"
-                  type="checkbox"
-                  checked={paraphraseEnabled}
-                  onChange={(e) => setParaphraseEnabled(e.target.checked)}
-                />
-                <label htmlFor="paraphrase-check-exp" className="paraphraseLabel">
-                  <span className="paraphraseTitle">Paraphraze</span>
-                  <span className="paraphraseHint">각 문항 지문에 대해 1단계 paraphrase 후 2단계 문제 생성을 적용합니다.</span>
-                </label>
-              </div>
-            </div>
-            <div className="modelSelectHalf">
-              <div className="modelSelectCard">
-                <label htmlFor="gpt-model-exp" className="modelSelectLabel">
-                  GPT 모델
-                </label>
-                <select id="gpt-model-exp" className="modelSelect" value={gptModel} onChange={(e) => setGptModel(e.target.value)}>
-                  <optgroup label="GPT-5">
-                    <option value="gpt-5.1">gpt-5.1</option>
-                    <option value="gpt-5">gpt-5</option>
-                    <option value="gpt-5-mini">gpt-5-mini</option>
-                    <option value="gpt-5-nano">gpt-5-nano</option>
-                    <option value="gpt-5-chat-latest">gpt-5-chat-latest</option>
-                  </optgroup>
-                  <optgroup label="GPT-4 / 이전">
-                    <option value="gpt-4o">gpt-4o</option>
-                    <option value="gpt-4o-mini">gpt-4o-mini</option>
-                    <option value="gpt-4-turbo">gpt-4-turbo</option>
-                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                  </optgroup>
-                </select>
-              </div>
-            </div>
-          </div>
+          <p className="globalPassageHint" style={{ marginBottom: 24 }}>
+            GPT 모델은 <strong>유형 관리</strong>(<code>/types</code>)에서 선택합니다. 기본 <code>gpt-5.4-mini</code>.
+          </p>
 
           <div className="sectionLabel">문항 구성</div>
           <p className="globalPassageHint" style={{ marginBottom: 16 }}>
-            각 문항을 접었다 펼칠 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.{' '}
+            각 문항을 접었다 펼칠 수 있습니다. Paraphraze는 문항마다 아코디언 안에서 따로 켜거나 끌 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.{' '}
             <Link href="/types" className="typesEmptyLink">
               유형 관리
             </Link>
@@ -329,6 +281,24 @@ export default function ExpectedQuestionsPage() {
                     </button>
                   )}
                 </summary>
+                <div className="paraphraseModelRow paraphraseModelRowSingle expectedAccordionParaphrase">
+                  <div className="paraphraseHalf paraphraseHalfFull">
+                    <div className="paraphraseRow">
+                      <input
+                        id={`paraphrase-check-exp-${index}`}
+                        type="checkbox"
+                        checked={Boolean(prob.paraphraseEnabled)}
+                        onChange={(e) => patchProblem(index, { paraphraseEnabled: e.target.checked })}
+                      />
+                      <label htmlFor={`paraphrase-check-exp-${index}`} className="paraphraseLabel">
+                        <span className="paraphraseTitle">Paraphraze</span>
+                        <span className="paraphraseHint">
+                          이 문항 지문에 대해 1단계 paraphrase 후 2단계 문제 생성을 적용합니다.
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
                 <div className="mainWorkRow expectedProblemInner">
                   <div className="mainWorkColLeft">
                     <div className="sectionLabel" style={{ marginBottom: 8 }}>
@@ -477,6 +447,11 @@ export default function ExpectedQuestionsPage() {
           </p>
         </>
       )}
+      <InsufficientCreditsModal
+        open={creditsModalOpen}
+        onClose={() => setCreditsModalOpen(false)}
+        message={creditsModalMessage}
+      />
     </div>
   );
 }

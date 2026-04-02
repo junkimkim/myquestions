@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import { toErrorMessage } from '@/lib/toErrorMessage';
+import { DEFAULT_GPT_MODEL } from '@/lib/openaiModels';
 
 const API_KEY_STORAGE = 'qforge_prompt_openai_key';
 
 export default function PromptAssistantPage() {
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('gpt-5-mini');
+  const [model, setModel] = useState(DEFAULT_GPT_MODEL);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,7 +78,7 @@ export default function PromptAssistantPage() {
       if (out == null) throw new Error('응답 형식이 올바르지 않습니다.');
       setMessages((prev) => [...prev, { role: 'assistant', content: out }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(toErrorMessage(e));
       setMessages((prev) => prev.slice(0, -1));
       setDraft(text);
     } finally {
@@ -114,6 +116,7 @@ export default function PromptAssistantPage() {
           />
           <select className="modelSelect promptModelSelect" value={model} onChange={(e) => setModel(e.target.value)}>
             <optgroup label="GPT-5">
+              <option value="gpt-5.4-mini">gpt-5.4-mini (기본)</option>
               <option value="gpt-5.1">gpt-5.1</option>
               <option value="gpt-5">gpt-5</option>
               <option value="gpt-5-mini">gpt-5-mini</option>

@@ -11,7 +11,9 @@
     "db:push": "supabase db push"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.100.0",
+    "@tosspayments/tosspayments-sdk": "^2.6.0",
     "docx": "^9.1.0",
     "file-saver": "^2.0.5",
     "next": "^15.1.0",

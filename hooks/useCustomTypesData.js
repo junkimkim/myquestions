@@ -15,7 +15,14 @@ export function useCustomTypesData() {
       const res = await fetch('/api/custom-types', { cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setLoadError(data.error || `불러오기 실패 (${res.status})`);
+        const raw = data.error;
+        const errStr =
+          typeof raw === 'string'
+            ? raw
+            : raw && typeof raw === 'object' && typeof raw.message === 'string'
+              ? raw.message
+              : `불러오기 실패 (${res.status})`;
+        setLoadError(errStr);
         setCustomTypes([]);
         setPrompts({});
         hydratedRef.current = true;

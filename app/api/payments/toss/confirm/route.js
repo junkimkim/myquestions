@@ -1,3 +1,5 @@
+import { isTossPaymentConfigured } from '@/lib/tossEffectiveKeys';
+import { cashGrantedFromPaymentMetadata } from '@/lib/pricingPacks';
 import { confirmTossPayment } from '@/lib/tossPayments';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -9,9 +11,9 @@ export const dynamic = 'force-dynamic';
  * 결제 승인 성공 시 토스 API confirm + `charge_credits` + `payments` paid.
  */
 export async function POST(request) {
-  if (!process.env.TOSS_PAYMENTS_SECRET_KEY) {
+  if (!isTossPaymentConfigured()) {
     return Response.json(
-      { error: { message: '토스 시크릿 키가 설정되지 않았습니다.', code: 'TOSS_NOT_CONFIGURED' } },
+      { error: { message: '토스 결제 키가 설정되지 않았습니다.', code: 'TOSS_NOT_CONFIGURED' } },
       { status: 503 },
     );
   }
@@ -65,11 +67,12 @@ export async function POST(request) {
   }
 
   if (row.status === 'paid') {
-    const credits = Number(row.metadata?.credits ?? 0);
+    const cash = cashGrantedFromPaymentMetadata(row.metadata);
     return Response.json({
       ok: true,
       idempotent: true,
-      creditsCharged: credits,
+      creditsCharged: cash,
+      cashCharged: cash,
       message: '이미 처리된 결제입니다.',
     });
   }
@@ -78,8 +81,8 @@ export async function POST(request) {
     return Response.json({ error: { message: '처리할 수 없는 주문 상태입니다.', code: 'INVALID_STATUS' } }, { status: 400 });
   }
 
-  const credits = Number(row.metadata?.credits ?? 0);
-  if (!Number.isFinite(credits) || credits <= 0) {
+  const credits = cashGrantedFromPaymentMetadata(row.metadata);
+  if (credits <= 0) {
     return Response.json({ error: { message: '주문 메타데이터가 올바르지 않습니다.', code: 'BAD_METADATA' } }, { status: 500 });
   }
 
@@ -122,7 +125,7 @@ export async function POST(request) {
   } catch (e) {
     console.error('[toss/confirm] charge_credits failed', e);
     return Response.json(
-      { error: { message: e?.message || '크레딧 충전에 실패했습니다.', code: 'CHARGE_FAILED' } },
+      { error: { message: e?.message || '캐쉬 충전에 실패했습니다.', code: 'CHARGE_FAILED' } },
       { status: 500 },
     );
   }
@@ -142,6 +145,7 @@ export async function POST(request) {
   return Response.json({
     ok: true,
     creditsCharged: credits,
+    cashCharged: credits,
     orderId,
   });
 }

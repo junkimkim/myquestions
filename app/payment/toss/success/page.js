@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import TossPaymentLogsHint from '@/components/TossPaymentLogsHint';
 import { dispatchWalletRefresh } from '@/lib/walletEvents';
 
 function SuccessContent() {
@@ -43,8 +44,8 @@ function SuccessContent() {
       setPhase('ok');
       setDetail(
         data.idempotent
-          ? '이미 처리된 결제입니다. 크레딧이 반영되어 있습니다.'
-          : `크레딧 ${data.creditsCharged != null ? data.creditsCharged : ''} 충전이 완료되었습니다.`,
+          ? '이미 처리된 결제입니다. 캐쉬가 반영되어 있습니다.'
+          : `캐쉬 ${data.cashCharged ?? data.creditsCharged ?? ''} 이 충전되었습니다.`,
       );
       router.refresh();
     })();
@@ -71,6 +72,7 @@ function SuccessContent() {
           <p className="dragHint">{detail}</p>
         </>
       )}
+      <TossPaymentLogsHint style={{ marginTop: 20 }} />
       <p className="dragHint" style={{ marginTop: 24 }}>
         <Link href="/pricing">요금·충전</Link>
         {' · '}

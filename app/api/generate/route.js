@@ -1,5 +1,13 @@
 import { randomUUID } from 'crypto';
-import { getCreditCostPerGeneration } from '@/lib/credits';
+import {
+  CASH_MAIN_PER_TYPE_CALL,
+  CASH_ONE_TYPE_PER_PASSAGE_UNIT,
+} from '@/lib/cashRules';
+import { getCashCostPerGeneration } from '@/lib/credits';
+import {
+  assertExpectedBatchReady,
+  consumeExpectedBatchSlot,
+} from '@/lib/expectedBatchRegistry';
 import { checkGenerateRateLimit } from '@/lib/generateRateLimit';
 import { DEFAULT_GPT_MODEL, isGpt5FamilyModel } from '@/lib/openaiModels';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
@@ -19,6 +27,28 @@ function summarizeInput(messages) {
 
 function errPayload(message, code, extra) {
   return { error: { message, code, ...extra } };
+}
+
+/**
+ * @param {Record<string, unknown>} body
+ * @returns {{ cost: number, expectedFreeBatchId: string | null }}
+ */
+function resolveGenerationCost(body) {
+  const batchId =
+    typeof body.expectedFreeBatchId === 'string' && body.expectedFreeBatchId.trim()
+      ? body.expectedFreeBatchId.trim()
+      : null;
+  if (batchId) {
+    return { cost: 0, expectedFreeBatchId: batchId };
+  }
+  if (body.cashPolicy === 'main') {
+    return { cost: CASH_MAIN_PER_TYPE_CALL, expectedFreeBatchId: null };
+  }
+  if (body.cashPolicy === 'one_type') {
+    const t = Math.max(1, Math.min(50, Number.parseInt(String(body.oneTypeSelectedCount ?? '1'), 10) || 1));
+    return { cost: CASH_ONE_TYPE_PER_PASSAGE_UNIT * t, expectedFreeBatchId: null };
+  }
+  return { cost: getCashCostPerGeneration(), expectedFreeBatchId: null };
 }
 
 export async function POST(request) {
@@ -64,7 +94,16 @@ export async function POST(request) {
     return Response.json(errPayload('messages 배열이 필요합니다.', 'BAD_REQUEST'), { status: 400 });
   }
 
-  const cost = getCreditCostPerGeneration();
+  const { cost, expectedFreeBatchId } = resolveGenerationCost(body);
+
+  if (expectedFreeBatchId) {
+    if (!assertExpectedBatchReady(expectedFreeBatchId, user.id)) {
+      return Response.json(
+        errPayload('예상문제 배치가 유효하지 않거나 남은 횟수가 없습니다. 처음부터 다시 시도해 주세요.', 'BAD_BATCH'),
+        { status: 400 },
+      );
+    }
+  }
 
   const { data: wallet, error: walletErr } = await supabase
     .from('user_wallets')
@@ -77,10 +116,10 @@ export async function POST(request) {
   }
 
   const balance = wallet?.balance ?? 0;
-  if (balance < cost) {
+  if (cost > 0 && balance < cost) {
     return Response.json(
       errPayload(
-        `크레딧이 부족합니다. (필요: ${cost}, 잔액: ${balance}) 충전 후 이용해 주세요.`,
+        `캐쉬가 부족합니다. (필요: ${cost}, 잔액: ${balance}) 충전 후 이용해 주세요.`,
         'INSUFFICIENT_CREDITS',
         { requiredCredits: cost, balance },
       ),
@@ -146,21 +185,23 @@ export async function POST(request) {
   }
 
   const ref = `spend:gen:${jobId}`;
-  const meta = { model: resolvedModel, path: 'generate' };
+  const meta = { model: resolvedModel, path: 'generate', expectedFreeBatchId: expectedFreeBatchId || undefined };
 
-  let spendResult;
-  try {
-    spendResult = await spendCreditsServer(user.id, cost, ref, meta);
-  } catch (e) {
-    const msg = e?.message ?? String(e);
-    await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
-    if (msg.includes('INSUFFICIENT_CREDIT_BALANCE') || msg.includes('INSUFFICIENT')) {
-      return Response.json(
-        errPayload('크레딧이 부족합니다. 잠시 후 다시 시도해 주세요.', 'INSUFFICIENT_CREDITS', { race: true }),
-        { status: 402 },
-      );
+  let spendResult = null;
+  if (cost > 0) {
+    try {
+      spendResult = await spendCreditsServer(user.id, cost, ref, meta);
+    } catch (e) {
+      const msg = e?.message ?? String(e);
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      if (msg.includes('INSUFFICIENT_CREDIT_BALANCE') || msg.includes('INSUFFICIENT')) {
+        return Response.json(
+          errPayload('캐쉬가 부족합니다. 잠시 후 다시 시도해 주세요.', 'INSUFFICIENT_CREDITS', { race: true }),
+          { status: 402 },
+        );
+      }
+      return Response.json(errPayload(msg, 'SPEND_FAILED'), { status: 500 });
     }
-    return Response.json(errPayload(msg, 'SPEND_FAILED'), { status: 500 });
   }
 
   const { error: outErr } = await admin.from('generation_outputs').insert({
@@ -170,18 +211,25 @@ export async function POST(request) {
 
   if (outErr) {
     console.error('[generate] generation_outputs insert failed', outErr);
-    try {
-      await chargeCreditsServer(user.id, cost, `refund:gen:${jobId}`, { reason: 'output_insert_failed', jobId });
-    } catch (re) {
-      console.error('[generate] refund after output failure failed', re);
+    if (cost > 0) {
+      try {
+        await chargeCreditsServer(user.id, cost, `refund:gen:${jobId}`, { reason: 'output_insert_failed', jobId });
+      } catch (re) {
+        console.error('[generate] refund after output failure failed', re);
+      }
     }
     await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
     return Response.json(errPayload('생성 결과 저장에 실패했습니다. 지원팀에 문의해 주세요.', 'OUTPUT_INSERT_FAILED'), { status: 500 });
   }
 
+  if (expectedFreeBatchId) {
+    consumeExpectedBatchSlot(expectedFreeBatchId, user.id);
+  }
+
   await admin.from('generation_jobs').update({ status: 'completed', input_summary: summary }).eq('id', jobId);
 
-  const balanceAfter = spendResult?.balance ?? balance - cost;
+  const balanceAfter =
+    spendResult?.balance ?? (cost > 0 ? balance - cost : balance);
 
   return Response.json({
     ...data,
@@ -189,6 +237,7 @@ export async function POST(request) {
       jobId,
       balanceAfter,
       creditsCharged: cost,
+      cashCharged: cost,
     },
   });
 }

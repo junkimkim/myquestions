@@ -334,6 +334,95 @@ body::before {
   overflow: auto;
 }
 
+.mypageLedgerRow {
+  align-items: baseline;
+}
+
+.mypageLedgerType {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.mypageLedgerAmtCharge {
+  font-weight: 600;
+  color: var(--success, #6ee7a8);
+  font-size: 0.82rem;
+}
+
+.mypageLedgerAmtSpend {
+  font-weight: 600;
+  color: var(--danger, #f87171);
+  font-size: 0.82rem;
+}
+
+.mypageLedgerBalance {
+  font-size: 0.75rem;
+  color: var(--text2);
+}
+
+.mypageLedgerRef {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  color: var(--text2);
+  word-break: break-all;
+}
+
+.mypageDeleteZone {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.mypageDeleteHint {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text2);
+}
+
+.mypageDeleteLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  color: var(--text2);
+}
+
+.mypageDeleteInput {
+  display: block;
+  width: 100%;
+  max-width: 280px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.mypageDeleteErr {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+.mypageDeleteBtn {
+  border: 1px solid rgba(232, 125, 125, 0.45);
+  color: var(--danger);
+  background: rgba(232, 125, 125, 0.08);
+}
+
+.mypageDeleteBtn:hover:not(:disabled) {
+  border-color: var(--danger);
+  background: rgba(232, 125, 125, 0.15);
+}
+
+.mypageDeleteBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .authNavWallet {
   font-size: 0.78rem;
   font-weight: 600;
@@ -420,6 +509,116 @@ body::before {
   font-size: 0.88rem;
   line-height: 1.55;
   max-width: 720px;
+}
+
+.pricingSelectWrap {
+  max-width: 560px;
+}
+
+.pricingRadioFieldset {
+  border: none;
+  padding: 0;
+  margin: 0 0 20px;
+  min-width: 0;
+}
+
+.pricingRadioLegend {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+  margin-bottom: 12px;
+  padding: 0;
+}
+
+.pricingRadioList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pricingRadioItem {
+  margin: 0;
+}
+
+.pricingRadioLabel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.pricingRadioLabel:hover {
+  border-color: rgba(232, 200, 125, 0.35);
+}
+
+.pricingRadioLabelActive {
+  border-color: rgba(232, 200, 125, 0.55);
+  background: rgba(232, 200, 125, 0.06);
+}
+
+.pricingRadioInput {
+  margin-top: 4px;
+  flex-shrink: 0;
+  accent-color: var(--accent, #e8c87d);
+  cursor: pointer;
+}
+
+.pricingRadioLabel:has(.pricingRadioInput:disabled) {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.pricingRadioBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pricingRadioTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
+.pricingRadioName {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text2);
+}
+
+.pricingRadioCredits {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.pricingRadioPrice {
+  font-size: 0.95rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.pricingRadioNote {
+  font-size: 0.8rem;
+  color: var(--text2);
+  line-height: 1.45;
+}
+
+.pricingPayBtnSingle {
+  max-width: 560px;
 }
 
 .pricingGrid {
@@ -2302,6 +2501,107 @@ body {
   font-size: 0.78rem;
   color: var(--text2);
   font-weight: 500;
+}
+
+/* /expected_questions — 시험지 메타 */
+.expectedExamMetaForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 16px;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.expectedExamMetaForm .expectedExamField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.expectedExamMetaForm .expectedExamField label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text2);
+}
+
+.expectedExamMetaForm .expectedExamField input,
+.expectedExamMetaForm .expectedExamField select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+
+.expectedExamMetaForm .expectedExamFieldFull {
+  grid-column: 1 / -1;
+}
+
+.expectedDownloadBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+/* html2canvas PDF 캡처용(화면 밖) */
+.expectedPdfExport {
+  position: fixed;
+  left: -14000px;
+  top: 0;
+  width: 794px;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  background: #ffffff;
+  color: #111111;
+  font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+}
+
+.expectedPdfMeta .expectedPdfExportTitle {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #ccc;
+}
+
+.expectedPdfMeta .expectedPdfExportLine {
+  font-size: 12px;
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+.expectedPdfProblems {
+  column-count: 2;
+  column-gap: 28px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.expectedPdfProblemBlock {
+  break-inside: avoid;
+  margin-bottom: 16px;
+}
+
+.expectedPdfProblemBlock h3 {
+  font-size: 12px;
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.expectedPdfProblemBlock pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
 }
 
 /* /expected_questions */

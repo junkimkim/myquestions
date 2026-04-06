@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { getEffectiveTossClientKey, isTossPaymentConfigured } from '@/lib/tossEffectiveKeys';
 import { getPackById } from '@/lib/pricingPacks';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * 토스 결제 전 주문 생성 — `payments` pending + 고유 orderId(toss external_id).
  */
 export async function POST(request) {
-  if (!process.env.TOSS_PAYMENTS_SECRET_KEY?.trim() || !process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY?.trim()) {
+  if (!isTossPaymentConfigured()) {
     return Response.json(
       { error: { message: '토스페이먼츠 키가 서버에 설정되지 않았습니다.', code: 'TOSS_NOT_CONFIGURED' } },
       { status: 503 },
@@ -40,7 +41,7 @@ export async function POST(request) {
   }
 
   const orderId = `toss_${randomUUID()}`;
-  const orderName = `QuizForge ${pack.name} (${pack.credits}크레딧)`;
+  const orderName = `QuizForge 캐쉬 충전 ${pack.cashGranted.toLocaleString()} (결제 ${pack.priceKrw.toLocaleString()}원)`;
 
   const admin = createSupabaseAdmin();
   const { error: insErr } = await admin.from('payments').insert({
@@ -50,8 +51,10 @@ export async function POST(request) {
     status: 'pending',
     external_id: orderId,
     metadata: {
-      credits: pack.credits,
+      cashGranted: pack.cashGranted,
+      credits: pack.cashGranted,
       packId: pack.id,
+      priceKrw: pack.priceKrw,
       orderName,
     },
   });
@@ -66,6 +69,6 @@ export async function POST(request) {
     orderName,
     amount: pack.priceKrw,
     customerKey: user.id,
-    clientKey: process.env.NEXT_PUBLIC_TOSS_PAYMENTS_CLIENT_KEY,
+    clientKey: getEffectiveTossClientKey(),
   });
 }

@@ -1,10 +1,10 @@
-import { getCreditCostPerGeneration } from '@/lib/credits';
+import { getCashCostPerGeneration } from '@/lib/credits';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * Phase 3: 로그인 사용자의 지갑 잔액 + 정책 상수(생성당 크레딧 비용).
+ * 로그인 사용자의 지갑 잔액 + 정책 상수(생성당 캐쉬 비용).
  */
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -28,10 +28,11 @@ export async function GET() {
   }
 
   const balance = row?.balance ?? 0;
-  const creditCostPerGeneration = getCreditCostPerGeneration();
+  const cashCostPerGeneration = getCashCostPerGeneration();
 
   return Response.json({
     balance,
-    creditCostPerGeneration,
+    cashCostPerGeneration,
+    creditCostPerGeneration: cashCostPerGeneration,
   });
 }

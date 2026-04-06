@@ -91,7 +91,7 @@ export default function AuthNavUser() {
       <Link href="/pricing" className="authNavWallet" title="요금·충전">
         {bal != null ? (
           <>
-            <span className="authNavWalletN">{bal.toLocaleString()}</span> 크레딧
+            <span className="authNavWalletN">{bal.toLocaleString()}</span> 캐쉬
           </>
         ) : (
           <span className="authNavMuted">잔액 …</span>

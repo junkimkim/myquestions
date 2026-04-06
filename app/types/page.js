@@ -99,7 +99,14 @@ export default function TypesManagePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setGptPrefsError(typeof data.error === 'string' ? data.error : '모델을 저장할 수 없습니다. 로그인해 주세요.');
+        const raw = data.error;
+        const msg =
+          typeof raw === 'string'
+            ? raw
+            : raw && typeof raw === 'object' && typeof raw.message === 'string'
+              ? raw.message
+              : '모델을 저장할 수 없습니다. 로그인해 주세요.';
+        setGptPrefsError(msg);
       }
     } catch (err) {
       setGptPrefsError(toErrorMessage(err));

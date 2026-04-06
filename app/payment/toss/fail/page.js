@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import TossPaymentLogsHint from '@/components/TossPaymentLogsHint';
 
 function FailContent() {
   const searchParams = useSearchParams();
@@ -47,6 +48,7 @@ function FailContent() {
           {notified ? ' · 기록 반영됨' : ''}
         </p>
       )}
+      <TossPaymentLogsHint style={{ marginTop: 20 }} />
       <p className="dragHint" style={{ marginTop: 24 }}>
         <Link href="/pricing">요금·충전으로 돌아가기</Link>
         {' · '}

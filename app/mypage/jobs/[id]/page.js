@@ -46,7 +46,7 @@ export default async function MypageJobDetailPage({ params }) {
           {job.type_label && ` · ${job.type_label}`}
           {job.model && ` · ${job.model}`}
           {' · '}
-          {job.cost_credits} 크레딧 · {job.status}
+          {job.cost_credits} 캐쉬 · {job.status}
         </p>
       </header>
 

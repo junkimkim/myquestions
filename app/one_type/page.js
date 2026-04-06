@@ -11,6 +11,10 @@ import { typeNeedsExtraInput } from '@/lib/typeExtraInput';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 import { toErrorMessage } from '@/lib/toErrorMessage';
 import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
+import { CASH_ONE_TYPE_PER_PASSAGE_UNIT } from '@/lib/cashRules';
+
+/** 한 유형 일괄 페이지는 유형 1개 고정 — 정책 확장 시 선택 유형 수로 곱함 */
+const ONE_TYPE_SELECTED_COUNT = 1;
 
 function IconBolt(props) {
   return (
@@ -70,6 +74,16 @@ export default function OneTypePage() {
     if (selectedTypeId && passageOnlyTypes.some((c) => c.id === selectedTypeId)) return;
     setSelectedTypeId(passageOnlyTypes[0]?.id ?? null);
   }, [ready, passageOnlyTypes, selectedTypeId]);
+
+  const filledPassageCount = useMemo(() => passages.filter((p) => p.trim()).length, [passages]);
+
+  const estimatedOneTypeCash = useMemo(
+    () =>
+      selectedTypeId
+        ? filledPassageCount * CASH_ONE_TYPE_PER_PASSAGE_UNIT * ONE_TYPE_SELECTED_COUNT
+        : 0,
+    [filledPassageCount, selectedTypeId],
+  );
 
   const setPassageAt = useCallback((index, value) => {
     setPassages((prev) => {
@@ -202,6 +216,8 @@ export default function OneTypePage() {
           ],
           max_tokens: maxTokens,
           temperature: 0.7,
+          cashPolicy: 'one_type',
+          oneTypeSelectedCount: ONE_TYPE_SELECTED_COUNT,
         });
         setResultsByIndex((prev) => ({
           ...prev,
@@ -256,7 +272,7 @@ export default function OneTypePage() {
           )}
 
           <p className="persistMsg" style={{ marginBottom: 16 }}>
-            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다.{' '}
+            생성은 <strong>로그인</strong>과 <strong>캐쉬</strong>로 진행됩니다.{' '}
           </p>
 
           <div className="mainWorkRow">
@@ -370,6 +386,13 @@ export default function OneTypePage() {
               )}
             </aside>
           </div>
+
+          {selectedTypeId && filledPassageCount > 0 && (
+            <p className="dragHint" style={{ marginBottom: 10 }}>
+              예상 소모 캐쉬: 약 <strong>{estimatedOneTypeCash.toLocaleString()}</strong> (지문 {filledPassageCount}개 × 유형{' '}
+              {ONE_TYPE_SELECTED_COUNT}개 × {CASH_ONE_TYPE_PER_PASSAGE_UNIT}캐쉬)
+            </p>
+          )}
 
           <button
             type="button"

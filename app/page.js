@@ -21,6 +21,7 @@ import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerate
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 import { toErrorMessage } from '@/lib/toErrorMessage';
 import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
+import { CASH_MAIN_PER_TYPE_CALL } from '@/lib/cashRules';
 import { formatVocabList } from '@/lib/vocabPrompt';
 import {
   GRAMMAR_SKIP_PASSAGE_EXPRS_TYPE_ID,
@@ -207,14 +208,10 @@ export default function Home() {
     [typeIds, activeTypes],
   );
 
-  const selectAllTypes = useCallback(() => {
-    setActiveTypes([...typeIds]);
-  }, [typeIds]);
-
-  const deselectAllTypes = useCallback(() => {
-    setActiveTypes([]);
-    setSupplementFocusTypeId(null);
-  }, []);
+  const estimatedMainCash = useMemo(
+    () => activeCount * CASH_MAIN_PER_TYPE_CALL,
+    [activeCount],
+  );
 
   const handleColumnDragOver = useCallback((e, kind) => {
     e.preventDefault();
@@ -285,6 +282,23 @@ export default function Home() {
     () => customTypes.filter((c) => typeNeedsExtraInput(c.id)),
     [customTypes, typeNeedsExtraInput],
   );
+
+  /** 상단 구역(지문만 입력하면 되는 유형)만 일괄 선택·해제 */
+  const selectAllPassageOnlyTypes = useCallback(() => {
+    const passageIds = typesPassageOnlyBucket.map((c) => c.id);
+    if (passageIds.length === 0) return;
+    const passageSet = new Set(passageIds);
+    setActiveTypes((prev) => {
+      const withoutPassage = prev.filter((id) => !passageSet.has(id));
+      return [...withoutPassage, ...passageIds];
+    });
+  }, [typesPassageOnlyBucket]);
+
+  const deselectPassageOnlyTypes = useCallback(() => {
+    const passageSet = new Set(typesPassageOnlyBucket.map((c) => c.id));
+    setActiveTypes((prev) => prev.filter((id) => !passageSet.has(id)));
+    setSupplementFocusTypeId((fid) => (fid && passageSet.has(fid) ? null : fid));
+  }, [typesPassageOnlyBucket]);
 
   const grammarWrongAnswerText = useMemo(() => {
     const n = clampGrammarWrongSpotCount(grammarWrongCount);
@@ -693,6 +707,7 @@ export default function Home() {
             ],
             max_tokens: 2200,
             temperature: 0.7,
+            cashPolicy: 'main',
           });
           setResults((prev) => ({
             ...prev,
@@ -771,6 +786,7 @@ export default function Home() {
           ],
           max_tokens: maxTokens,
           temperature: 0.7,
+          cashPolicy: 'main',
         });
 
         setResults((prev) => ({
@@ -1055,7 +1071,7 @@ export default function Home() {
             </p>
           )}
           <p className="persistMsg" style={{ marginBottom: 16 }}>
-            생성은 <strong>로그인</strong>과 <strong>크레딧</strong>으로 진행됩니다.{' '}
+            생성은 <strong>로그인</strong>과 <strong>캐쉬</strong>로 진행됩니다.{' '}
           </p>
 
           <div className="mainWorkRow">
@@ -1102,10 +1118,10 @@ export default function Home() {
             <aside className="mainWorkColRight" aria-label="문제 유형 선택">
               <div className="sectionLabel">문제 유형 선택</div>
               <div className="typesBulkBar">
-                <button type="button" className="btnSm btnGhost typesBulkBtn" onClick={selectAllTypes}>
+                <button type="button" className="btnSm btnGhost typesBulkBtn" onClick={selectAllPassageOnlyTypes}>
                   전체 선택
                 </button>
-                <button type="button" className="btnSm btnGhost typesBulkBtn" onClick={deselectAllTypes}>
+                <button type="button" className="btnSm btnGhost typesBulkBtn" onClick={deselectPassageOnlyTypes}>
                   전체 해제
                 </button>
               </div>
@@ -1135,6 +1151,13 @@ export default function Home() {
 
             </aside>
           </div>
+
+          {activeCount > 0 && (
+            <p className="dragHint" style={{ marginBottom: 10 }}>
+              예상 소모 캐쉬: 약 <strong>{estimatedMainCash.toLocaleString()}</strong> (선택 유형 {activeCount}개 ×{' '}
+              {CASH_MAIN_PER_TYPE_CALL}캐쉬)
+            </p>
+          )}
 
           <button
             type="button"

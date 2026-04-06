@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import QuizForgeNav from '@/components/QuizForgeNav';
@@ -10,6 +11,18 @@ import {
 import { cashGrantedFromPaymentMetadata } from '@/lib/pricingPacks';
 import MypageDeleteAccount from '@/components/MypageDeleteAccount';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+
+const TRUSTED_AVATAR_HOSTNAMES = new Set(['lh3.googleusercontent.com', 'k.kakaocdn.net']);
+
+function isTrustedAvatarUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === 'https:' && TRUSTED_AVATAR_HOSTNAMES.has(hostname);
+  } catch {
+    return false;
+  }
+}
 
 function formatSignedLedgerAmount(type, amount) {
   const n = Number(amount);
@@ -105,10 +118,10 @@ export default async function MypagePage() {
           <span className="mypageLabel">가입</span>
           <span>{profile?.created_at ? new Date(profile.created_at).toLocaleString('ko-KR') : '—'}</span>
         </p>
-        {profile?.avatar_url && (
+        {isTrustedAvatarUrl(profile?.avatar_url) && (
           <p className="mypageRow">
             <span className="mypageLabel">아바타</span>
-            <img src={profile.avatar_url} alt="프로필" width={40} height={40} className="mypageAvatar" />
+            <Image src={profile.avatar_url} alt="프로필" width={40} height={40} className="mypageAvatar" />
           </p>
         )}
         <div className="sectionLabel" style={{ marginTop: 20 }}>

@@ -79,7 +79,7 @@ export async function POST(request) {
     return Response.json({ error: { message: msg, code: 'SPEND_FAILED' } }, { status: 500 });
   }
 
-  registerExpectedBatch(batchId, user.id, n);
+  await registerExpectedBatch(batchId, user.id, n);
 
   return Response.json({
     ok: true,

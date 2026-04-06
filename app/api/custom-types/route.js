@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loadSeedPrompts, loadSeedTypes } from '@/lib/customTypesSeed.server';
 import { mergeTypesAndPrompts } from '@/lib/mergeCustomTypesPayload';
 import { defaultCustomPromptForKind } from '@/lib/defaultPrompts';
@@ -47,6 +48,12 @@ export async function GET() {
 
 /** 새 유형 추가 */
 export async function POST(request) {
+  const authClient = await createSupabaseServerClient();
+  const { data: { user }, error: authErr } = await authClient.auth.getUser();
+  if (authErr || !user) {
+    return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
   try {
     let body;
     try {
@@ -89,6 +96,12 @@ export async function POST(request) {
 
 /** 프롬프트 일괄 저장(메인 모달) */
 export async function PUT(request) {
+  const authClient = await createSupabaseServerClient();
+  const { data: { user }, error: authErr } = await authClient.auth.getUser();
+  if (authErr || !user) {
+    return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
   try {
     let body;
     try {

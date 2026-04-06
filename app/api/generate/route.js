@@ -9,7 +9,7 @@ import {
   consumeExpectedBatchSlot,
 } from '@/lib/expectedBatchRegistry';
 import { checkGenerateRateLimit } from '@/lib/generateRateLimit';
-import { DEFAULT_GPT_MODEL, isGpt5FamilyModel } from '@/lib/openaiModels';
+import { DEFAULT_GPT_MODEL, isAllowedGptModelId, isGpt5FamilyModel } from '@/lib/openaiModels';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { chargeCreditsServer, spendCreditsServer } from '@/lib/serverCredits';
@@ -62,7 +62,7 @@ export async function POST(request) {
     return Response.json(errPayload('로그인이 필요합니다.', 'UNAUTHORIZED'), { status: 401 });
   }
 
-  const rl = checkGenerateRateLimit(user.id);
+  const rl = await checkGenerateRateLimit(user.id);
   if (!rl.ok) {
     return Response.json(
       errPayload('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.', 'RATE_LIMITED', { retryAfterSec: rl.retryAfterSec }),
@@ -74,6 +74,8 @@ export async function POST(request) {
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
+  // OpenAI 키는 모든 포맷(sk-..., sk-proj-..., sk-svcacct-...) 공통으로 'sk-' 로 시작함.
+  // 향후 포맷이 변경될 경우 이 조건도 함께 검토 필요.
   if (!openaiKey || !openaiKey.startsWith('sk-')) {
     return Response.json(
       errPayload('서버에 OpenAI API 키가 설정되지 않았습니다. 관리자에게 문의하세요.', 'OPENAI_NOT_CONFIGURED'),
@@ -97,7 +99,7 @@ export async function POST(request) {
   const { cost, expectedFreeBatchId } = resolveGenerationCost(body);
 
   if (expectedFreeBatchId) {
-    if (!assertExpectedBatchReady(expectedFreeBatchId, user.id)) {
+    if (!await assertExpectedBatchReady(expectedFreeBatchId, user.id)) {
       return Response.json(
         errPayload('예상문제 배치가 유효하지 않거나 남은 횟수가 없습니다. 처음부터 다시 시도해 주세요.', 'BAD_BATCH'),
         { status: 400 },
@@ -127,7 +129,8 @@ export async function POST(request) {
     );
   }
 
-  const resolvedModel = typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_GPT_MODEL;
+  const requestedModel = typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_GPT_MODEL;
+  const resolvedModel = isAllowedGptModelId(requestedModel) ? requestedModel : DEFAULT_GPT_MODEL;
   const summary =
     typeof inputSummary === 'string' && inputSummary.trim()
       ? inputSummary.trim().slice(0, 500)
@@ -171,11 +174,24 @@ export async function POST(request) {
     body: JSON.stringify(openaiBody),
   });
 
-  const data = await res.json();
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+    return Response.json(
+      errPayload('OpenAI 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR'),
+      { status: 502 },
+    );
+  }
 
   if (!res.ok) {
     await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
-    return Response.json(data, { status: res.status });
+    const openaiCode = data?.error?.code ?? data?.error?.type ?? null;
+    return Response.json(
+      errPayload('OpenAI 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR', { openaiCode }),
+      { status: res.status >= 500 ? 502 : res.status },
+    );
   }
 
   const content = data?.choices?.[0]?.message?.content;
@@ -223,7 +239,7 @@ export async function POST(request) {
   }
 
   if (expectedFreeBatchId) {
-    consumeExpectedBatchSlot(expectedFreeBatchId, user.id);
+    await consumeExpectedBatchSlot(expectedFreeBatchId, user.id);
   }
 
   await admin.from('generation_jobs').update({ status: 'completed', input_summary: summary }).eq('id', jobId);

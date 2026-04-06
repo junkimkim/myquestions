@@ -15,6 +15,7 @@ import {
   applyGrammarSlotPlaceholders,
   buildUserPrompt,
 } from '@/lib/paraphrasePrompt';
+import FocusTrap from '@/components/FocusTrap';
 import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
 import ProblemSupplementFields from '@/components/ProblemSupplementFields';
 import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerateClient';
@@ -114,7 +115,7 @@ export default function Home() {
   const [exampleModal, setExampleModal] = useState(null);
   const [dropTargetKind, setDropTargetKind] = useState(null);
   const dragTypeIdRef = useRef(null);
-  const [underlinedStentence, setUnderlinedStentence] = useState('');
+  const [underlinedSentence, setUnderlinedSentence] = useState('');
   const [grammarWrongCount, setGrammarWrongCount] = useState(2);
   const [grammarWrongLetters, setGrammarWrongLetters] = useState(['B', 'C', 'D', 'E']);
   const [grammarWrongCorrections, setGrammarWrongCorrections] = useState(['', '', '', '']);
@@ -156,7 +157,7 @@ export default function Home() {
       grammarPassageExprs,
       grammarAnswerForms,
       writingAnswer,
-      underlinedStentence,
+      underlinedSentence,
       grammarWrongCount,
       grammarWrongLetters,
       grammarWrongCorrections,
@@ -172,7 +173,7 @@ export default function Home() {
       grammarPassageExprs,
       grammarAnswerForms,
       writingAnswer,
-      underlinedStentence,
+      underlinedSentence,
       grammarWrongCount,
       grammarWrongLetters,
       grammarWrongCorrections,
@@ -190,7 +191,7 @@ export default function Home() {
     if (patch.grammarPassageExprs !== undefined) setGrammarPassageExprs(patch.grammarPassageExprs);
     if (patch.grammarAnswerForms !== undefined) setGrammarAnswerForms(patch.grammarAnswerForms);
     if (patch.writingAnswer !== undefined) setWritingAnswer(patch.writingAnswer);
-    if (patch.underlinedStentence !== undefined) setUnderlinedStentence(patch.underlinedStentence);
+    if (patch.underlinedSentence !== undefined) setUnderlinedSentence(patch.underlinedSentence);
     if (patch.grammarWrongCount !== undefined) setGrammarWrongCount(patch.grammarWrongCount);
     if (patch.grammarWrongLetters !== undefined) setGrammarWrongLetters(patch.grammarWrongLetters);
     if (patch.grammarWrongCorrections !== undefined) setGrammarWrongCorrections(patch.grammarWrongCorrections);
@@ -446,7 +447,7 @@ export default function Home() {
     }
 
     const answerTrim = writingAnswer.trim();
-    const underlinedTrim = underlinedStentence.trim();
+    const underlinedTrim = underlinedSentence.trim();
     const grammarWrongAnswerTrim = grammarWrongAnswerText.trim();
     const anyActiveWriting = customActive.some((id) => {
       const c = customTypes.find((x) => x.id === id);
@@ -818,7 +819,7 @@ export default function Home() {
     grammarPassageExprs,
     grammarAnswerForms,
     writingAnswer,
-    underlinedStentence,
+    underlinedSentence,
     grammarWrongCount,
     grammarWrongLetters,
     grammarWrongCorrections,
@@ -1011,7 +1012,7 @@ export default function Home() {
                 onChange={(e) => setParaphraseEnabled(e.target.checked)}
               />
               <label htmlFor="paraphrase-check-main" className="paraphraseLabel">
-                <span className="paraphraseTitle">Paraphraze</span>
+                <span className="paraphraseTitle">Paraphrase</span>
                 <span className="paraphraseHint">
                   켜면 먼저 지문을 paraphrase한 뒤, 동일한 내용의 새로운 지문으로 선택한 유형의 변형 문제를 생성합니다. (1단계 지문 Paraphrase → 2단계 문제 생성)
                 </span>
@@ -1259,6 +1260,7 @@ export default function Home() {
             role="presentation"
           >
             {exampleModal?.open && (
+              <FocusTrap onEscape={closeExampleModal}>
               <div
                 className="modal modalExample"
                 onClick={(e) => e.stopPropagation()}
@@ -1305,17 +1307,11 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              </FocusTrap>
             )}
           </div>
         </>
       )}
-      <footer className="siteBusinessFooter">
-        <p>상호명: 제이케이에듀케이션</p>
-        <p>사업자등록번호: 605-54-01113</p>
-        <p>대표자명: 김준기</p>
-        <p>사업장 주소: 경기도 부천시 소사구 성무로17번길 55-6, 1층</p>
-        <p>유선번호: 010-6893-2048</p>
-      </footer>
       <InsufficientCreditsModal
         open={creditsModalOpen}
         onClose={() => setCreditsModalOpen(false)}

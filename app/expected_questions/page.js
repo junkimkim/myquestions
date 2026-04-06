@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { saveAs } from 'file-saver';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import FocusTrap from '@/components/FocusTrap';
 import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
 import ProblemSupplementFields from '@/components/ProblemSupplementFields';
 import { getTypeInfo } from '@/lib/defaultPrompts';
@@ -512,7 +513,7 @@ export default function ExpectedQuestionsPage() {
 
           <div className="sectionLabel">문항 구성</div>
           <p className="globalPassageHint" style={{ marginBottom: 16 }}>
-            각 문항을 접었다 펼칠 수 있습니다. Paraphraze는 문항마다 아코디언 안에서 따로 켜거나 끌 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.
+            각 문항을 접었다 펼칠 수 있습니다. Paraphrase는 문항마다 아코디언 안에서 따로 켜거나 끌 수 있습니다. 문항마다 지문과 문제 유형을 한 개씩만 지정합니다.
           </p>
 
           {problems.map((prob, index) => {
@@ -562,7 +563,7 @@ export default function ExpectedQuestionsPage() {
                         onChange={(e) => patchProblem(index, { paraphraseEnabled: e.target.checked })}
                       />
                       <label htmlFor={`paraphrase-check-exp-${index}`} className="paraphraseLabel">
-                        <span className="paraphraseTitle">Paraphraze</span>
+                        <span className="paraphraseTitle">Paraphrase</span>
                         <span className="paraphraseHint">
                           이 문항 지문에 대해 1단계 paraphrase 후 2단계 문제 생성을 적용합니다.
                         </span>
@@ -792,6 +793,7 @@ export default function ExpectedQuestionsPage() {
             role="presentation"
           >
             {exampleModal?.open && (
+              <FocusTrap onEscape={closeExampleModal}>
               <div
                 className="modal modalExample"
                 onClick={(e) => e.stopPropagation()}
@@ -838,6 +840,7 @@ export default function ExpectedQuestionsPage() {
                   </button>
                 </div>
               </div>
+              </FocusTrap>
             )}
           </div>
         </>

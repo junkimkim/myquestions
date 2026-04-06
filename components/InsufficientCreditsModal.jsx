@@ -1,7 +1,9 @@
 'use client';
 
+import { useRef } from 'react';
 import Link from 'next/link';
 import { toErrorMessage } from '@/lib/toErrorMessage';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 function modalMessageText(message) {
   if (message == null || message === '') return null;
@@ -10,13 +12,17 @@ function modalMessageText(message) {
 }
 
 export default function InsufficientCreditsModal({ open, onClose, message }) {
+  const overlayRef = useRef(null);
+  useFocusTrap(overlayRef, { enabled: open, onEscape: onClose });
+
   if (!open) return null;
 
   const body = modalMessageText(message) ?? '생성에 필요한 캐쉬가 부족합니다.';
 
   return (
     <div
-      className="modalOverlay"
+      ref={overlayRef}
+      className="modalOverlay modalOverlayOpen"
       role="dialog"
       aria-modal="true"
       aria-labelledby="cash-modal-title"

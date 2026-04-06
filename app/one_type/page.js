@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import QuizForgeNav from '@/components/QuizForgeNav';
+import FocusTrap from '@/components/FocusTrap';
 import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
 import { callGeneratePost, isInsufficientCreditsError } from '@/lib/callGenerateClient';
 import { getTypeInfo, getTypeKind } from '@/lib/defaultPrompts';
@@ -319,7 +320,7 @@ export default function OneTypePage() {
                         onChange={(e) => setParaphraseEnabled(e.target.checked)}
                       />
                       <label htmlFor="paraphrase-check-onetype" className="paraphraseLabel">
-                        <span className="paraphraseTitle">Paraphraze</span>
+                        <span className="paraphraseTitle">Paraphrase</span>
                         <span className="paraphraseHint">
                           켜면 각 지문에 대해 1단계 paraphrase 후 2단계 문제 생성이 적용됩니다.
                         </span>
@@ -494,6 +495,7 @@ export default function OneTypePage() {
             role="presentation"
           >
             {exampleModal?.open && (
+              <FocusTrap onEscape={closeExampleModal}>
               <div
                 className="modal modalExample"
                 onClick={(e) => e.stopPropagation()}
@@ -540,6 +542,7 @@ export default function OneTypePage() {
                   </button>
                 </div>
               </div>
+              </FocusTrap>
             )}
           </div>
         </>

@@ -1,3 +1,12 @@
+/**
+ * 관리자 전용 — 커스텀 문항 유형 관리 페이지.
+ *
+ * 이 페이지는 QuizForgeNav에 링크가 없으며, URL(/types)을 직접 입력해야 접근할 수 있습니다.
+ * 일반 사용자에게 노출되지 않도록 의도된 설계입니다.
+ *
+ * 주의: /api/custom-types 엔드포인트는 로그인 인증을 요구합니다.
+ *       운영 환경에서는 반드시 로그인 후 사용하세요.
+ */
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -8,6 +17,7 @@ import {
   defaultCustomPromptForKind,
   getTypeKind,
 } from '@/lib/defaultPrompts';
+import FocusTrap from '@/components/FocusTrap';
 import QuizForgeNav from '@/components/QuizForgeNav';
 import GptModelSelect from '@/components/GptModelSelect';
 import { DEFAULT_GPT_MODEL, isAllowedGptModelId } from '@/lib/openaiModels';
@@ -560,6 +570,7 @@ export default function TypesManagePage() {
         role="presentation"
       >
         {editId && (
+          <FocusTrap onEscape={closeEditModal}>
           <div className="modal modalWide" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
             <h3 id="edit-modal-title">유형 수정</h3>
             <p className="modalIntro">
@@ -692,6 +703,7 @@ export default function TypesManagePage() {
               </button>
             </div>
           </div>
+          </FocusTrap>
         )}
       </div>
     </div>

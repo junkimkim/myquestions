@@ -66,6 +66,79 @@ body::before {
   margin: 0.2em 0;
 }
 
+.siteBusinessFooterLinks {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+}
+
+.siteBusinessFooterLinks a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.siteBusinessFooterLinks a:hover {
+  text-decoration: underline;
+}
+
+/* 이용약관·개인정보처리방침 */
+.legalPage {
+  padding-bottom: 40px;
+}
+
+.legalDoc {
+  max-width: 720px;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.legalDoc section {
+  margin-bottom: 28px;
+}
+
+.legalDoc h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+}
+
+.legalDoc h3 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  color: var(--text2);
+}
+
+.legalDoc p {
+  margin: 0 0 12px;
+}
+
+.legalDoc ul,
+.legalDoc ol {
+  margin: 8px 0 12px;
+  padding-left: 1.35em;
+}
+
+.legalDoc li {
+  margin: 6px 0;
+}
+
+.legalNote {
+  font-size: 0.82rem;
+  color: var(--text2);
+  line-height: 1.6;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+  margin-bottom: 28px;
+}
+
+.legalPageBack {
+  margin-top: 32px;
+}
+
 /* 메인: 지문·추가입력(6) | 유형 선택(4) */
 .mainWorkRow {
   display: flex;
@@ -443,17 +516,7 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(8, 10, 14, 0.72);
-  backdrop-filter: blur(4px);
-}
+/* .modalOverlay — 하단의 정규 정의와 병합됨 */
 
 .modalCard {
   width: 100%;
@@ -2043,11 +2106,12 @@ header {
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
   z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
+  background: rgba(8, 10, 14, 0.72);
   backdrop-filter: blur(4px);
   opacity: 0;
   pointer-events: none;

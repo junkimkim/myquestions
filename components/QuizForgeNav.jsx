@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import AuthNavUser from '@/components/AuthNavUser';
 
+/**
+ * 메인 네비게이션 바.
+ *
+ * 의도적으로 숨긴 관리자 전용 페이지:
+ *   - /types  : 커스텀 문항 유형 관리 (CRUD). 운영자가 직접 URL로 접근.
+ *               일반 사용자에게 노출하지 않으므로 링크를 포함하지 않음.
+ */
 export default function QuizForgeNav() {
   const pathname = usePathname();
 

@@ -158,8 +158,8 @@ export default function ProblemSupplementFields({ problemIndex, typeId, customTy
           <input
             type="text"
             className="vocabWordInput"
-            value={problem.underlinedStentence}
-            onChange={(e) => onPatch({ underlinedStentence: e.target.value })}
+            value={problem.underlinedSentence}
+            onChange={(e) => onPatch({ underlinedSentence: e.target.value })}
             placeholder="밑줄 친 표현(원문 그대로)을 입력하세요."
             autoComplete="off"
           />

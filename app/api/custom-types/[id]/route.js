@@ -1,4 +1,5 @@
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loadSeedTypeById } from '@/lib/customTypesSeed.server';
 import { defaultCustomPromptForKind } from '@/lib/defaultPrompts';
 
@@ -22,6 +23,12 @@ function normalizeErrorMessage(e, fallback = '요청 처리 중 오류가 발생
 }
 
 export async function PATCH(request, context) {
+  const authClient = await createSupabaseServerClient();
+  const { data: { user }, error: authErr } = await authClient.auth.getUser();
+  if (authErr || !user) {
+    return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
   try {
     const params = await context.params;
     const id = params?.id;
@@ -100,7 +107,13 @@ export async function PATCH(request, context) {
   }
 }
 
-export async function DELETE(_request, context) {
+export async function DELETE(request, context) {
+  const authClient = await createSupabaseServerClient();
+  const { data: { user }, error: authErr } = await authClient.auth.getUser();
+  if (authErr || !user) {
+    return Response.json({ error: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
   try {
     const params = await context.params;
     const id = params?.id;

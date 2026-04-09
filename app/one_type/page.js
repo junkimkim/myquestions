@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { saveAs } from 'file-saver';
 import QuizForgeNav from '@/components/QuizForgeNav';
 import FocusTrap from '@/components/FocusTrap';
 import InsufficientCreditsModal from '@/components/InsufficientCreditsModal';
@@ -13,6 +14,7 @@ import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 import { toErrorMessage } from '@/lib/toErrorMessage';
 import { usePreferredGptModel } from '@/hooks/usePreferredGptModel';
 import { CASH_ONE_TYPE_PER_PASSAGE_UNIT } from '@/lib/cashRules';
+import { formatExamMetaLines, getDefaultExamMeta } from '@/lib/expectedExamMeta';
 
 /** 한 유형 일괄 페이지는 유형 1개 고정 — 정책 확장 시 선택 유형 수로 곱함 */
 const ONE_TYPE_SELECTED_COUNT = 1;
@@ -64,6 +66,47 @@ export default function OneTypePage() {
   const [creditsModalOpen, setCreditsModalOpen] = useState(false);
   const [creditsModalMessage, setCreditsModalMessage] = useState('');
   const [exampleModal, setExampleModal] = useState(null);
+  const [examMeta, setExamMeta] = useState(() => getDefaultExamMeta());
+  const pdfMetaRef = useRef(null);
+  const pdfProblemsRef = useRef(null);
+
+  const patchExamMeta = useCallback((patch) => {
+    setExamMeta((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  const hasDownloadable = useMemo(
+    () => passages.some((_, i) => resultsByIndex[i]?.status === 'ok'),
+    [passages, resultsByIndex],
+  );
+
+  const downloadWord = useCallback(async () => {
+    const typeInfo = selectedTypeId ? getTypeInfo(selectedTypeId, customTypes) : null;
+    const items = passages
+      .map((_, i) => {
+        const r = resultsByIndex[i];
+        if (!r || r.status !== 'ok') return null;
+        return { num: i + 1, label: typeInfo?.label ?? r.label, text: r.text };
+      })
+      .filter(Boolean);
+    if (items.length === 0) return;
+    const { buildExpectedExamDocxBlob } = await import('@/lib/expectedExamDocx');
+    const blob = await buildExpectedExamDocxBlob(examMeta, items);
+    const y = examMeta.year?.trim() || String(new Date().getFullYear());
+    const sem = examMeta.semester === '2' ? '2학기' : '1학기';
+    const ex = examMeta.examType === 'final' ? '기말' : '중간';
+    const title = (examMeta.paperTitle?.trim() || '한유형일괄').replace(/[\\/:*?"<>|]/g, '_');
+    saveAs(blob, `${title}_${y}_${sem}_${ex}.docx`);
+  }, [examMeta, passages, resultsByIndex, selectedTypeId, customTypes]);
+
+  const downloadPdf = useCallback(async () => {
+    if (!pdfMetaRef.current || !pdfProblemsRef.current) return;
+    const { downloadExpectedExamPdf } = await import('@/lib/expectedExamPdf');
+    const y = examMeta.year?.trim() || String(new Date().getFullYear());
+    const sem = examMeta.semester === '2' ? '2학기' : '1학기';
+    const ex = examMeta.examType === 'final' ? '기말' : '중간';
+    const title = (examMeta.paperTitle?.trim() || '한유형일괄').replace(/[\\/:*?"<>|]/g, '_');
+    await downloadExpectedExamPdf(pdfMetaRef.current, pdfProblemsRef.current, `${title}_${y}_${sem}_${ex}.pdf`);
+  }, [examMeta]);
 
   const passageOnlyTypes = useMemo(
     () => customTypes.filter((c) => !typeNeedsExtraInput(c.id, customTypes, prompts)),
@@ -211,7 +254,7 @@ export default function OneTypePage() {
           messages: [
             {
               role: 'system',
-              content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다.',
+              content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다. 추론 과정이나 중간 단계(STEP 등)는 출력하지 말고, 최종 결과만 출력하세요.',
             },
             { role: 'user', content: prompt },
           ],
@@ -275,6 +318,95 @@ export default function OneTypePage() {
           <p className="persistMsg" style={{ marginBottom: 16 }}>
             생성은 <strong>로그인</strong>과 <strong>캐쉬</strong>로 진행됩니다.{' '}
           </p>
+
+          <div className="sectionLabel">시험지 정보 (다운로드 시 상단에 표시)</div>
+          <div className="expectedExamMetaForm">
+            <div className="expectedExamField">
+              <label htmlFor="ot-academy">학원 이름</label>
+              <input
+                id="ot-academy"
+                type="text"
+                value={examMeta.academyName}
+                onChange={(e) => patchExamMeta({ academyName: e.target.value })}
+                placeholder="예: ○○학원"
+                autoComplete="organization"
+              />
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-teacher">선생님 이름</label>
+              <input
+                id="ot-teacher"
+                type="text"
+                value={examMeta.teacherName}
+                onChange={(e) => patchExamMeta({ teacherName: e.target.value })}
+                placeholder="담당 강사"
+                autoComplete="name"
+              />
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-school">학교명</label>
+              <input
+                id="ot-school"
+                type="text"
+                value={examMeta.schoolName}
+                onChange={(e) => patchExamMeta({ schoolName: e.target.value })}
+                placeholder="예: ○○고등학교"
+              />
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-grade">학년</label>
+              <input
+                id="ot-grade"
+                type="text"
+                value={examMeta.grade}
+                onChange={(e) => patchExamMeta({ grade: e.target.value })}
+                placeholder="예: 고1"
+              />
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-year">연도</label>
+              <input
+                id="ot-year"
+                type="text"
+                inputMode="numeric"
+                value={examMeta.year}
+                onChange={(e) => patchExamMeta({ year: e.target.value })}
+                placeholder="예: 2026"
+              />
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-semester">학기</label>
+              <select
+                id="ot-semester"
+                value={examMeta.semester}
+                onChange={(e) => patchExamMeta({ semester: e.target.value })}
+              >
+                <option value="1">1학기</option>
+                <option value="2">2학기</option>
+              </select>
+            </div>
+            <div className="expectedExamField">
+              <label htmlFor="ot-examtype">시험 구분</label>
+              <select
+                id="ot-examtype"
+                value={examMeta.examType}
+                onChange={(e) => patchExamMeta({ examType: e.target.value })}
+              >
+                <option value="mid">중간고사</option>
+                <option value="final">기말고사</option>
+              </select>
+            </div>
+            <div className="expectedExamField expectedExamFieldFull">
+              <label htmlFor="ot-title">시험지 명</label>
+              <input
+                id="ot-title"
+                type="text"
+                value={examMeta.paperTitle}
+                onChange={(e) => patchExamMeta({ paperTitle: e.target.value })}
+                placeholder="예: 2026년 1학기 중간고사"
+              />
+            </div>
+          </div>
 
           <div className="mainWorkRow">
             <div className="mainWorkColLeft">
@@ -414,6 +546,20 @@ export default function OneTypePage() {
             )}
           </button>
 
+          {showResults && hasDownloadable && !validationError && !generating && (
+            <div className="expectedDownloadBar">
+              <span className="dragHint" style={{ marginRight: 8 }}>
+                생성된 문항을 파일로 저장합니다. (메타 1단 · 문제 2단)
+              </span>
+              <button type="button" className="btnSm btnPrimary" onClick={downloadWord}>
+                Word(.docx) 다운로드
+              </button>
+              <button type="button" className="btnSm btnPrimary" onClick={downloadPdf}>
+                PDF 다운로드
+              </button>
+            </div>
+          )}
+
           {showResults && (
             <div className="resultsWrap">
               {validationError && (
@@ -544,6 +690,32 @@ export default function OneTypePage() {
               </div>
               </FocusTrap>
             )}
+          </div>
+
+          {/* PDF 렌더용 숨김 DOM — html2canvas가 캡처 */}
+          <div ref={pdfMetaRef} className="expectedPdfExport expectedPdfMeta" aria-hidden="true">
+            <div className="expectedPdfExportTitle">{examMeta.paperTitle?.trim() || '한 유형 일괄 문제'}</div>
+            {formatExamMetaLines(examMeta)
+              .filter((line) => !line.startsWith('시험지 명:'))
+              .map((line, i) => (
+                <p key={i} className="expectedPdfExportLine">
+                  {line}
+                </p>
+              ))}
+          </div>
+          <div ref={pdfProblemsRef} className="expectedPdfExport expectedPdfProblems" aria-hidden="true">
+            {passages.map((_, i) => {
+              const r = resultsByIndex[i];
+              if (!r || r.status !== 'ok') return null;
+              return (
+                <div key={i} className="expectedPdfProblemBlock">
+                  <h3>
+                    지문 {i + 1} ({r.label})
+                  </h3>
+                  <pre>{r.text}</pre>
+                </div>
+              );
+            })}
           </div>
         </>
       )}

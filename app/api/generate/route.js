@@ -9,7 +9,7 @@ import {
   consumeExpectedBatchSlot,
 } from '@/lib/expectedBatchRegistry';
 import { checkGenerateRateLimit } from '@/lib/generateRateLimit';
-import { DEFAULT_GPT_MODEL, isAllowedGptModelId, isGpt5FamilyModel } from '@/lib/openaiModels';
+import { DEFAULT_MODEL, isAllowedModelId, isClaudeModel, isGpt5FamilyModel } from '@/lib/aiModels';
 import { createSupabaseAdmin } from '@/lib/supabase/admin';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { chargeCreditsServer, spendCreditsServer } from '@/lib/serverCredits';
@@ -74,14 +74,7 @@ export async function POST(request) {
   }
 
   const openaiKey = process.env.OPENAI_API_KEY;
-  // OpenAI 키는 모든 포맷(sk-..., sk-proj-..., sk-svcacct-...) 공통으로 'sk-' 로 시작함.
-  // 향후 포맷이 변경될 경우 이 조건도 함께 검토 필요.
-  if (!openaiKey || !openaiKey.startsWith('sk-')) {
-    return Response.json(
-      errPayload('서버에 OpenAI API 키가 설정되지 않았습니다. 관리자에게 문의하세요.', 'OPENAI_NOT_CONFIGURED'),
-      { status: 503 },
-    );
-  }
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
 
   let body;
   try {
@@ -129,8 +122,26 @@ export async function POST(request) {
     );
   }
 
-  const requestedModel = typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_GPT_MODEL;
-  const resolvedModel = isAllowedGptModelId(requestedModel) ? requestedModel : DEFAULT_GPT_MODEL;
+  const requestedModel = typeof model === 'string' && model.trim() ? model.trim() : DEFAULT_MODEL;
+  const resolvedModel = isAllowedModelId(requestedModel) ? requestedModel : DEFAULT_MODEL;
+
+  // provider 분기: 모델을 확정한 뒤에 키 유무를 검증합니다.
+  if (isClaudeModel(resolvedModel)) {
+    if (!anthropicKey || !anthropicKey.startsWith('sk-ant-')) {
+      return Response.json(
+        errPayload('서버에 Anthropic API 키가 설정되지 않았습니다. .env.local 에 ANTHROPIC_API_KEY 를 추가하세요.', 'ANTHROPIC_NOT_CONFIGURED'),
+        { status: 503 },
+      );
+    }
+  } else {
+    // OpenAI 키는 모든 포맷(sk-..., sk-proj-..., sk-svcacct-...) 공통으로 'sk-' 로 시작함.
+    if (!openaiKey || !openaiKey.startsWith('sk-')) {
+      return Response.json(
+        errPayload('서버에 OpenAI API 키가 설정되지 않았습니다. .env.local 에 OPENAI_API_KEY 를 추가하세요.', 'OPENAI_NOT_CONFIGURED'),
+        { status: 503 },
+      );
+    }
+  }
   const summary =
     typeof inputSummary === 'string' && inputSummary.trim()
       ? inputSummary.trim().slice(0, 500)
@@ -156,48 +167,109 @@ export async function POST(request) {
     return Response.json(errPayload('생성 작업을 시작할 수 없습니다.', 'JOB_INSERT_FAILED'), { status: 500 });
   }
 
-  const openaiBody = {
-    model: resolvedModel,
-    messages,
-    max_tokens: max_tokens ?? 1200,
-  };
-  if (!isGpt5FamilyModel(resolvedModel)) {
-    openaiBody.temperature = temperature ?? 0.7;
-  }
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${openaiKey}`,
-    },
-    body: JSON.stringify(openaiBody),
-  });
-
+  let content;
   let data;
-  try {
-    data = await res.json();
-  } catch {
-    await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
-    return Response.json(
-      errPayload('OpenAI 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR'),
-      { status: 502 },
-    );
-  }
 
-  if (!res.ok) {
-    await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
-    const openaiCode = data?.error?.code ?? data?.error?.type ?? null;
-    return Response.json(
-      errPayload('OpenAI 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR', { openaiCode }),
-      { status: res.status >= 500 ? 502 : res.status },
-    );
-  }
+  if (isClaudeModel(resolvedModel)) {
+    // ── Anthropic Claude Messages API ────────────────────────────────────────
+    const systemMsg = Array.isArray(messages)
+      ? messages.find((m) => m?.role === 'system')?.content ?? undefined
+      : undefined;
+    const anthropicMessages = Array.isArray(messages)
+      ? messages.filter((m) => m?.role !== 'system').map((m) => ({ role: m.role, content: m.content }))
+      : [];
 
-  const content = data?.choices?.[0]?.message?.content;
-  if (content == null || typeof content !== 'string') {
-    await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
-    return Response.json(errPayload('OpenAI 응답 형식이 올바르지 않습니다.', 'OPENAI_BAD_RESPONSE'), { status: 502 });
+    const anthropicBody = {
+      model: resolvedModel,
+      max_tokens: max_tokens ?? 1200,
+      messages: anthropicMessages,
+      ...(systemMsg ? { system: systemMsg } : {}),
+    };
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify(anthropicBody),
+    });
+
+    try {
+      data = await res.json();
+    } catch {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      return Response.json(
+        errPayload('Anthropic 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'ANTHROPIC_ERROR'),
+        { status: 502 },
+      );
+    }
+
+    if (!res.ok) {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      const anthropicCode = data?.error?.type ?? null;
+      const anthropicMsg = data?.error?.message ?? null;
+      console.error('[generate] Anthropic error', res.status, { anthropicCode, anthropicMsg, model: resolvedModel, data });
+      return Response.json(
+        errPayload(
+          `Anthropic 오류: ${anthropicMsg ?? '요청에 실패했습니다. 잠시 후 다시 시도해 주세요.'}`,
+          'ANTHROPIC_ERROR',
+          { anthropicCode, anthropicMsg },
+        ),
+        { status: res.status >= 500 ? 502 : res.status },
+      );
+    }
+
+    content = data?.content?.[0]?.text;
+    if (content == null || typeof content !== 'string') {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      return Response.json(errPayload('Anthropic 응답 형식이 올바르지 않습니다.', 'ANTHROPIC_BAD_RESPONSE'), { status: 502 });
+    }
+  } else {
+    // ── OpenAI Chat Completions API ───────────────────────────────────────────
+    const openaiBody = {
+      model: resolvedModel,
+      messages,
+      max_tokens: max_tokens ?? 1200,
+    };
+    if (!isGpt5FamilyModel(resolvedModel)) {
+      openaiBody.temperature = temperature ?? 0.7;
+    }
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify(openaiBody),
+    });
+
+    try {
+      data = await res.json();
+    } catch {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      return Response.json(
+        errPayload('OpenAI 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR'),
+        { status: 502 },
+      );
+    }
+
+    if (!res.ok) {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      const openaiCode = data?.error?.code ?? data?.error?.type ?? null;
+      return Response.json(
+        errPayload('OpenAI 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.', 'OPENAI_ERROR', { openaiCode }),
+        { status: res.status >= 500 ? 502 : res.status },
+      );
+    }
+
+    content = data?.choices?.[0]?.message?.content;
+    if (content == null || typeof content !== 'string') {
+      await admin.from('generation_jobs').update({ status: 'failed' }).eq('id', jobId);
+      return Response.json(errPayload('OpenAI 응답 형식이 올바르지 않습니다.', 'OPENAI_BAD_RESPONSE'), { status: 502 });
+    }
   }
 
   const ref = `spend:gen:${jobId}`;
@@ -247,13 +319,18 @@ export async function POST(request) {
   const balanceAfter =
     spendResult?.balance ?? (cost > 0 ? balance - cost : balance);
 
-  return Response.json({
+  // 클라이언트(callGenerateClient.js)는 항상 OpenAI 형식(choices[0].message.content)을 기대합니다.
+  // Claude 응답은 content[0].text 이므로 동일한 구조로 정규화합니다.
+  const normalizedResponse = {
     ...data,
+    choices: [{ message: { role: 'assistant', content } }],
     quizforge: {
       jobId,
       balanceAfter,
       creditsCharged: cost,
       cashCharged: cost,
     },
-  });
+  };
+
+  return Response.json(normalizedResponse);
 }

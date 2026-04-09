@@ -1,4 +1,4 @@
-import { DEFAULT_GPT_MODEL, isAllowedGptModelId } from '@/lib/openaiModels';
+import { DEFAULT_MODEL, isAllowedModelId } from '@/lib/aiModels';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -8,7 +8,7 @@ export async function GET() {
   try {
     supabase = await createSupabaseServerClient();
   } catch {
-    return Response.json({ preferredGptModel: DEFAULT_GPT_MODEL });
+    return Response.json({ preferredGptModel: DEFAULT_MODEL });
   }
 
   const {
@@ -17,7 +17,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
 
   if (authErr || !user) {
-    return Response.json({ preferredGptModel: DEFAULT_GPT_MODEL });
+    return Response.json({ preferredGptModel: DEFAULT_MODEL });
   }
 
   const { data: row, error } = await supabase
@@ -31,9 +31,9 @@ export async function GET() {
   }
 
   const preferred =
-    row?.preferred_gpt_model && isAllowedGptModelId(row.preferred_gpt_model)
+    row?.preferred_gpt_model && isAllowedModelId(row.preferred_gpt_model)
       ? row.preferred_gpt_model.trim()
-      : DEFAULT_GPT_MODEL;
+      : DEFAULT_MODEL;
 
   return Response.json({ preferredGptModel: preferred });
 }
@@ -63,7 +63,7 @@ export async function PATCH(request) {
   }
 
   const raw = typeof body.preferredGptModel === 'string' ? body.preferredGptModel.trim() : '';
-  if (!raw || !isAllowedGptModelId(raw)) {
+  if (!raw || !isAllowedModelId(raw)) {
     return Response.json({ error: '유효하지 않은 모델입니다.' }, { status: 400 });
   }
 

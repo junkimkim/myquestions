@@ -702,7 +702,7 @@ export default function Home() {
             messages: [
               {
                 role: 'system',
-                content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 어휘·영영풀이 형식 지시를 정확히 따릅니다.',
+                content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 어휘·영영풀이 형식 지시를 정확히 따릅니다. 추론 과정이나 중간 단계(STEP 등)는 출력하지 말고, 최종 결과만 출력하세요.',
               },
               { role: 'user', content: prompt },
             ],
@@ -781,7 +781,7 @@ export default function Home() {
           messages: [
             {
               role: 'system',
-              content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다.',
+              content: '당신은 고등학교 내신 영어 문제 전문 출제자입니다. 주어진 지문을 분석하여 고품질의 변형문제를 생성합니다. 추론 과정이나 중간 단계(STEP 등)는 출력하지 말고, 최종 결과만 출력하세요.',
             },
             { role: 'user', content: prompt },
           ],

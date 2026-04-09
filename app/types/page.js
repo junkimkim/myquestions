@@ -20,7 +20,7 @@ import {
 import FocusTrap from '@/components/FocusTrap';
 import QuizForgeNav from '@/components/QuizForgeNav';
 import GptModelSelect from '@/components/GptModelSelect';
-import { DEFAULT_GPT_MODEL, isAllowedGptModelId } from '@/lib/openaiModels';
+import { DEFAULT_MODEL, isAllowedModelId } from '@/lib/aiModels';
 import { toErrorMessage } from '@/lib/toErrorMessage';
 import { useCustomTypesData } from '@/hooks/useCustomTypesData';
 
@@ -72,7 +72,7 @@ export default function TypesManagePage() {
   const [editError, setEditError] = useState('');
   const [editOk, setEditOk] = useState('');
 
-  const [preferredGptModel, setPreferredGptModel] = useState(DEFAULT_GPT_MODEL);
+  const [preferredGptModel, setPreferredGptModel] = useState(DEFAULT_MODEL);
   const [gptPrefsLoaded, setGptPrefsLoaded] = useState(false);
   const [gptPrefsError, setGptPrefsError] = useState(null);
 
@@ -82,7 +82,7 @@ export default function TypesManagePage() {
       try {
         const res = await fetch('/api/me/preferences', { cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
-        if (!cancelled && typeof data.preferredGptModel === 'string' && isAllowedGptModelId(data.preferredGptModel)) {
+        if (!cancelled && typeof data.preferredGptModel === 'string' && isAllowedModelId(data.preferredGptModel)) {
           setPreferredGptModel(data.preferredGptModel);
         }
       } catch {
@@ -355,7 +355,7 @@ export default function TypesManagePage() {
           disabled={!gptPrefsLoaded}
         />
         <p className="formHint" style={{ marginTop: 10, marginBottom: 0 }}>
-          로그인한 경우 프로필에 저장됩니다. 미로그인 시 이 브라우저 세션에서는 기본값({DEFAULT_GPT_MODEL})으로 생성됩니다.
+          로그인한 경우 프로필에 저장됩니다. 미로그인 시 이 브라우저 세션에서는 기본값({DEFAULT_MODEL})으로 생성됩니다.
         </p>
         {gptPrefsError && (
           <p className="persistMsg persistMsgErr" style={{ marginTop: 10, marginBottom: 0 }}>
